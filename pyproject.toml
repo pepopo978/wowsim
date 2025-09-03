@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "wow_sim"
+version = "1.0.0"
+description = ""
+authors = ["mcdallas <mcdallas@protonmail.com>", "pepopo978 <pepopo978@gmail.com>"]
+packages = [
+    { include = "sim" },
+    { include = "examples" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+simpy = "^4.1.1"
+tqdm = "^4.46.1"
+plotly = "^5.24.1"
+numpy = "^2.1.1"
+pandas = "^2.2.2"
+dill = "^0.3.8"
+loky = "^3.5.3"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
