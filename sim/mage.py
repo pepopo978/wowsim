@@ -5,7 +5,7 @@ from sim.character import CooldownUsages
 from sim.decorators import simrotation, simclass
 from sim.env import Environment
 from sim.equipped_items import EquippedItems
-from sim.fire_dots import FireballDot, PyroblastDot
+from sim.fire_dots import FireballDot, PyroblastDot, Flamestriker4Dot, Flamestriker5Dot, Flamestriker6Dot
 from sim.hot_streak import HotStreak
 from sim.mage_options import MageOptions
 from sim.mage_rotation_cooldowns import *
@@ -189,6 +189,42 @@ class Mage(Character):
         while True:
             self._use_cds(cds)
             yield from self._pyroblast()
+
+    def _spam_flamestrike_r6_r5_r4(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        self._use_cds(cds)
+        yield from self._random_delay(delay)
+
+        rank_cycle = 0  # 0=R6, 1=R5, 2=R4
+        while True:
+            self._use_cds(cds)
+            if rank_cycle == 0:
+                yield from self._flamestrike_r6()
+            elif rank_cycle == 1:
+                yield from self._flamestrike_r5()
+            else:  # rank_cycle == 2
+                yield from self._flamestrike_r4()
+            rank_cycle = (rank_cycle + 1) % 3  # Cycle through 0, 1, 2
+
+    def _spam_flamestrike_r6_r5(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        self._use_cds(cds)
+        yield from self._random_delay(delay)
+
+        use_r6 = True  # Start with R6
+        while True:
+            self._use_cds(cds)
+            if use_r6:
+                yield from self._flamestrike_r6()
+            else:
+                yield from self._flamestrike_r5()
+            use_r6 = not use_r6  # Alternate for next cast
+
+    def _spam_flamestrike_r6(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        self._use_cds(cds)
+        yield from self._random_delay(delay)
+
+        while True:
+            self._use_cds(cds)
+            yield from self._flamestrike_r6()
 
     def _spam_frostbolts(self, cds: CooldownUsages = CooldownUsages(), delay=2):
         self._use_cds(cds)
@@ -471,7 +507,7 @@ class Mage(Character):
                 dmg *= 1.20
                 arcane_rupture_applied = True
 
-            if self.opts.t35_3_set and spell in {Spell.FLAMESTRIKE, Spell.CONE_OF_COLD, Spell.FROST_NOVA, Spell.BLASTWAVE, Spell.ARCANE_EXPLOSION}:
+            if self.opts.t35_3_set and spell in {Spell.FLAMESTRIKER6, Spell.CONE_OF_COLD, Spell.FROST_NOVA, Spell.BLASTWAVE, Spell.ARCANE_EXPLOSION}:
                 if self._roll_proc(10):
                     dmg *= 1.15
                     self.print(f"{spell.value} T3 3-set proc")
@@ -763,6 +799,12 @@ class Mage(Character):
                 self.env.debuffs.add_dot(FireballDot, self, 0)
             elif spell == Spell.PYROBLAST:
                 self.env.debuffs.add_dot(PyroblastDot, self, 0)
+            elif spell == Spell.FLAMESTRIKER4:
+                self.env.debuffs.add_dot(Flamestriker4Dot, self, 0)
+            elif spell == Spell.FLAMESTRIKER5:
+                self.env.debuffs.add_dot(Flamestriker5Dot, self, 0)
+            elif spell == Spell.FLAMESTRIKER6:
+                self.env.debuffs.add_dot(Flamestriker6Dot, self, 0)
             elif (spell == Spell.SCORCH or spell == Spell.FIREBLAST) and self.tal.fire_vuln:
                 fire_vuln_chance = 100
                 if self.tal.fire_vuln < 3:
@@ -849,6 +891,57 @@ class Mage(Character):
                                     max_dmg=max_dmg,
                                     base_cast_time=casting_time,
                                     custom_gcd=1.0,
+                                    crit_modifier=crit_modifier)
+
+    def _flamestrike_r4(self):
+        min_dmg = 220
+        max_dmg = 273
+        casting_time = 2.5
+        crit_modifier = 0
+
+        crit_modifier += self.tal.improved_flamestrike * 5  # 5% crit per rank
+
+        if self.opts.zg_5_set:
+            casting_time -= 0.5  # ZG 5-set bonus
+
+        yield from self._fire_spell(spell=Spell.FLAMESTRIKER4,
+                                    min_dmg=min_dmg,
+                                    max_dmg=max_dmg,
+                                    base_cast_time=casting_time,
+                                    crit_modifier=crit_modifier)
+
+    def _flamestrike_r5(self):
+        min_dmg = 291
+        max_dmg = 360
+        casting_time = 2.5
+        crit_modifier = 0
+
+        crit_modifier += self.tal.improved_flamestrike * 5  # 5% crit per rank
+
+        if self.opts.zg_5_set:
+            casting_time -= 0.5  # ZG 5-set bonus
+
+        yield from self._fire_spell(spell=Spell.FLAMESTRIKER5,
+                                    min_dmg=min_dmg,
+                                    max_dmg=max_dmg,
+                                    base_cast_time=casting_time,
+                                    crit_modifier=crit_modifier)
+
+    def _flamestrike_r6(self):
+        min_dmg = 375
+        max_dmg = 460
+        casting_time = 2.5
+        crit_modifier = 0
+
+        crit_modifier += self.tal.improved_flamestrike * 5  # 5% crit per rank
+
+        if self.opts.zg_5_set:
+            casting_time -= 0.5  # ZG 5-set bonus
+
+        yield from self._fire_spell(spell=Spell.FLAMESTRIKER6,
+                                    min_dmg=min_dmg,
+                                    max_dmg=max_dmg,
+                                    base_cast_time=casting_time,
                                     crit_modifier=crit_modifier)
 
     def _frost_spell(self,
@@ -1061,6 +1154,18 @@ class Mage(Character):
     @simrotation("(Fire) Pyroblast (Spam)")
     def spam_pyroblast(self, cds: CooldownUsages = CooldownUsages(), delay=2):
         return partial(self._set_rotation, name="spam_pyroblast")(cds=cds, delay=delay)
+
+    @simrotation("(Fire) Flamestrike R6/R5/R4 (Alternating)")
+    def spam_flamestrike_r6_r5_r4(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        return partial(self._set_rotation, name="spam_flamestrike_r6_r5_r4")(cds=cds, delay=delay)
+
+    @simrotation("(Fire) Flamestrike R6/R5 (Alternating)")
+    def spam_flamestrike_r6_r5(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        return partial(self._set_rotation, name="spam_flamestrike_r6_r5")(cds=cds, delay=delay)
+
+    @simrotation("(Fire) Flamestrike R6 (Spam)")
+    def spam_flamestrike_r6(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        return partial(self._set_rotation, name="spam_flamestrike_r6")(cds=cds, delay=delay)
 
     @simrotation("(Fire) Scorch (Spam)")
     def spam_scorch(self, cds: CooldownUsages = CooldownUsages(), delay=2):

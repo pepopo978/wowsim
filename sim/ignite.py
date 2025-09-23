@@ -4,7 +4,7 @@ from sim import JUSTIFY
 from sim.env import Environment
 from sim.mage import Mage, Spell
 
-IGNITE_WINDOW = 6
+IGNITE_WINDOW = 4
 IGNITE_TICK_TIME = 2
 IGNITE_NUM_TICKS = IGNITE_WINDOW / IGNITE_TICK_TIME  # 2 ticks per ignite window
 IGNITE_TICK_AMOUNT_PER_TICK_PER_TALENT_POINT = .08 / IGNITE_NUM_TICKS  # 8% per tick per talent point

@@ -29,7 +29,12 @@ class Spell(Enum):
     PYROBLAST = "Pyroblast"
     SCORCH = "Scorch"
     FIREBLAST = "Fire Blast"
-    FLAMESTRIKE = "Flamestrike"
+    FLAMESTRIKER4 = "Flamestriker4"
+    FLAMESTRIKER4_DOT = "Flamestriker4 DoT"
+    FLAMESTRIKER5 = "Flamestriker5"
+    FLAMESTRIKER5_DOT = "Flamestriker5 DoT"
+    FLAMESTRIKER6 = "Flamestriker6"
+    FLAMESTRIKER6_DOT = "Flamestriker6 DoT"
     FROSTBOLT = "Frostbolt"
     FROSTBOLTRK3 = "Frostbolt Rank 3"
     FROSTBOLTRK4 = "Frostbolt Rank 4"
@@ -67,11 +72,16 @@ SPELL_COEFFICIENTS = {
     Spell.ARCANE_RUPTURE: 0.9,
     Spell.ARCANE_EXPLOSION: .143,
     Spell.BLASTWAVE: .129,
-    Spell.FLAMESTRIKE: .157,
+    Spell.FLAMESTRIKER6: .157,
+    Spell.FLAMESTRIKER6_DOT: 0.02,
     Spell.FIREBALL: 1.0,
     Spell.PYROBLAST: 1.0,
     Spell.SCORCH: 0.4285,
     Spell.FIREBLAST: 0.4285,
+    Spell.FLAMESTRIKER4: .157,
+    Spell.FLAMESTRIKER4_DOT: 0.02,
+    Spell.FLAMESTRIKER5: .157,
+    Spell.FLAMESTRIKER5_DOT: 0.02,
     Spell.FROSTBOLT: 0.814,
     Spell.FROSTBOLTRK3: 0.4627,  # 2.2 / 3.5 * 0.95 * 0.775 spell lvl 14 has additional reduction
     Spell.FROSTBOLTRK4: 0.7057,  # 2.6 / 3.5 * 0.95 spell lvl 20
@@ -119,7 +129,9 @@ SPELL_TRIGGERS_ON_HIT = {
     Spell.ARCANE_EXPLOSION: True,
     Spell.FROST_NOVA: False,
     Spell.CONE_OF_COLD: True,
-    Spell.FLAMESTRIKE: True,
+    Spell.FLAMESTRIKER4: True,
+    Spell.FLAMESTRIKER5: True,
+    Spell.FLAMESTRIKER6: True,
     Spell.BLASTWAVE: True,
 
     # Druid
@@ -152,6 +164,8 @@ SPELL_HITS_MULTIPLE_TARGETS = {
     Spell.ARCANE_EXPLOSION: True,
     Spell.FROST_NOVA: True,
     Spell.CONE_OF_COLD: True,
-    Spell.FLAMESTRIKE: True,
+    Spell.FLAMESTRIKER4: True,
+    Spell.FLAMESTRIKER5: True,
+    Spell.FLAMESTRIKER6: True,
     Spell.BLASTWAVE: True,
 }

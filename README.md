@@ -214,7 +214,7 @@ There are premade talent configurations for each spec:
 ```
 FireMageTalents = MageTalents(
     ignite=5,
-    imp_scorch=3,
+    fire_vuln=3,
     fire_power=5,
     critical_mass=0,  # generally counted in crit already, 2% per point
     hot_streak=2,

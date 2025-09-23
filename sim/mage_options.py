@@ -14,6 +14,7 @@ class MageOptions:
     extend_ignite_with_scorch: bool = simoption("Extend ignite with Scorch", default=False, spec="Fire")
     pyro_on_t2_proc: bool = simoption("Cast Pyroblast on T2 proc", default=True, spec="Fire")
     pyro_on_max_hot_streak: bool = simoption("Cast Pyroblast on max Hot Streak stacks", default=True, spec="Fire")
+    zg_5_set: bool = simoption("ZG 5-set bonus -0.5 sec on Flamestrike", default=False, spec="Fire")
 
     # Frost
     frostbolt_rank: int = simoption("Frostbolt rank (11, 4, or 3)", default=11, spec="Frost")

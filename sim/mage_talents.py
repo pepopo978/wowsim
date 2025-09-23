@@ -14,6 +14,7 @@ class MageTalents:
     critical_mass: int = 0
     hot_streak: int = 0
     incinerate_crit: int = 0
+    improved_flamestrike: int = 0
     fire_blast_cooldown: float = 8
     fire_blast_gcd: float = 1.5
 
@@ -68,11 +69,12 @@ class FireMageTalents(MageTalents):
         super().__init__(
             improved_fireball=5,
             ignite=5,
-            imp_scorch=3,
+            fire_vuln=3,
             fire_power=5,
-            critical_mass=0,  # generally counted in crit already, 2% per point
+            critical_mass=3,
             hot_streak=2,
             incinerate_crit=4,
+            improved_flamestrike=3,
             fire_blast_cooldown=6.5,
             fire_blast_gcd=1
         )
