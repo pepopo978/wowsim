@@ -63,7 +63,7 @@ class CharacterConfigWindow(tk.Toplevel):
             row=1, column=1, sticky=tk.W, padx=5, pady=5)
 
         ttk.Label(stats_frame, text="Crit:").grid(row=1, column=2, sticky=tk.W, padx=5, pady=5)
-        self.crit_var = tk.IntVar(value=self.character_data.get('crit', 35))
+        self.crit_var = tk.DoubleVar(value=self.character_data.get('crit', 35))
         ttk.Spinbox(stats_frame, textvariable=self.crit_var, from_=0, to=100, increment=1, width=8).grid(
             row=1, column=3, sticky=tk.W, padx=5, pady=5)
 
@@ -73,7 +73,7 @@ class CharacterConfigWindow(tk.Toplevel):
             row=2, column=1, sticky=tk.W, padx=5, pady=5)
 
         ttk.Label(stats_frame, text="Haste:").grid(row=2, column=2, sticky=tk.W, padx=5, pady=5)
-        self.haste_var = tk.IntVar(value=self.character_data.get('haste', 5))
+        self.haste_var = tk.DoubleVar(value=self.character_data.get('haste', 5))
         ttk.Spinbox(stats_frame, textvariable=self.haste_var, from_=0, to=100, increment=1, width=8).grid(
             row=2, column=3, sticky=tk.W, padx=5, pady=5)
 
