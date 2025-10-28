@@ -12,7 +12,7 @@ from sim.equipped_items import EquippedItems
 from sim.mage_rotation_cooldowns import *
 from sim.nature_dots import InsectSwarmDot
 from sim.spell import Spell, SPELL_COEFFICIENTS, SPELL_TRIGGERS_ON_HIT, SPELL_HITS_MULTIPLE_TARGETS, \
-    SPELL_HAS_TRAVEL_TIME
+    SPELL_PROJECTILE_SPEED
 from sim.spell_school import DamageType
 from sim.talent_school import TalentSchool
 
@@ -107,28 +107,22 @@ class Druid(Character):
 
         return int(dmg)
 
-    # caller must handle any gcd cooldown
-    def _spell(self,
-               spell: Spell,
-               damage_type: DamageType,
-               talent_school: TalentSchool,
-               min_dmg: int,
-               max_dmg: int,
-               base_cast_time: float,
-               crit_modifier: float,
-               cooldown: float,
-               on_gcd: bool,
-               calculate_cast_time: bool = True):
-        had_natures_grace = self.natures_grace_active
+    # resolve damage when spell reaches the target
+    def _spell_resolve(self,
+                       travel_time: float,
+                       spell: Spell,
+                       damage_type: DamageType,
+                       talent_school: TalentSchool,
+                       min_dmg: int,
+                       max_dmg: int,
+                       crit_modifier: float,
+                       casting_time: float,
+                       gcd_wait_time: float,
+                       had_natures_grace: bool,
+                       resolved_callback):
 
-        casting_time = self._get_cast_time(base_cast_time, damage_type) if calculate_cast_time else base_cast_time
-
-        # account for gcd
-        gcd = self.env.GCD
-        if spell == Spell.WRATH:
-            gcd -= 0.1 * self.tal.imp_wrath
-        if on_gcd and casting_time < gcd and cooldown == 0:
-            cooldown = gcd - casting_time if casting_time > self.lag else gcd
+        if travel_time:
+            yield self.env.timeout(travel_time)
 
         hit = self._roll_hit(self._get_hit_chance(spell), damage_type)
         crit = False
@@ -148,14 +142,14 @@ class Druid(Character):
             dmg = int(dmg * partial_amount)
             partial_desc = f"({int(partial_amount * 100)}% partial)"
 
-        if casting_time:
-            yield self.env.timeout(casting_time)
-
         description = ""
         if self.env.print:
-            description = f"({round(casting_time, 2)} cast)"
-            if cooldown:
-                description += f" ({round(cooldown, 2)} gcd)"
+            if travel_time:
+                description = f"({round(travel_time, 2)} travel)"
+            else:
+                description = f"({round(casting_time, 2)} cast)"
+            if gcd_wait_time:
+                description += f" ({round(gcd_wait_time, 2)} gcd)"
 
             if had_natures_grace:
                 description += " (NG)"
@@ -189,19 +183,92 @@ class Druid(Character):
             self.env.debuffs.add_dot(MoonfireDot, self, 0)
 
         if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
-            self.env.process(self._check_for_procs(
+            self._check_for_procs(
+                spell=spell,
+                damage_type=damage_type)
+
+        self.env.meter.register_spell_dmg(
+            char_name=self.name,
+            spell_name=spell.value,
+            dmg=dmg,
+            cast_time=round(casting_time + gcd_wait_time, 2),
+            aoe=spell in SPELL_HITS_MULTIPLE_TARGETS)
+
+        if resolved_callback:
+            resolved_callback(spell, hit, crit, dmg, partial_amount)
+        else:
+            raise Exception("missing spell resolved callback")
+
+    # caller must handle any gcd cooldown
+    # handle spell cast
+    def _spell(self,
+               spell: Spell,
+               damage_type: DamageType,
+               talent_school: TalentSchool,
+               min_dmg: int,
+               max_dmg: int,
+               base_cast_time: float,
+               crit_modifier: float,
+               cooldown: float,
+               on_gcd: bool,
+               resolved_callback,
+               calculate_cast_time: bool = True):
+        had_natures_grace = self.natures_grace_active
+
+        casting_time = self._get_cast_time(base_cast_time, damage_type) if calculate_cast_time else base_cast_time
+
+        # account for gcd
+        gcd = self.env.GCD
+        if spell == Spell.WRATH:
+            gcd -= 0.1 * self.tal.imp_wrath
+        gcd_wait_time = 0
+        if on_gcd and casting_time < gcd and cooldown == 0:
+            gcd_wait_time = gcd - casting_time if casting_time > self.lag else gcd
+
+        # wait for cast
+        if casting_time:
+            yield self.env.timeout(casting_time)
+
+        if spell in SPELL_PROJECTILE_SPEED:
+            self.print(f"{spell.value} ({round(casting_time, 2)} cast)")
+            # trigger spell resolve when it hits the target
+            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+            self.env.process(
+                self._spell_resolve(
+                    travel_time=travel_time,
+                    spell=spell,
+                    damage_type=damage_type,
+                    talent_school=talent_school,
+                    min_dmg=min_dmg,
+                    max_dmg=max_dmg,
+                    crit_modifier=crit_modifier,
+                    casting_time=casting_time,
+                    gcd_wait_time=gcd_wait_time,
+                    had_natures_grace=had_natures_grace,
+                    resolved_callback=resolved_callback)
+            )
+        else:
+            # spell hits target immediately
+            yield from self._spell_resolve(
+                travel_time=0,
                 spell=spell,
                 damage_type=damage_type,
-                delay=spell in SPELL_HAS_TRAVEL_TIME))
+                talent_school=talent_school,
+                min_dmg=min_dmg,
+                max_dmg=max_dmg,
+                crit_modifier=crit_modifier,
+                casting_time=casting_time,
+                gcd_wait_time=gcd_wait_time,
+                had_natures_grace=had_natures_grace,
+                resolved_callback=resolved_callback)
 
-            self.env.meter.register_spell_dmg(
-                char_name=self.name,
-                spell_name=spell.value,
-                dmg=dmg,
-                cast_time=round(casting_time + cooldown, 2),
-                aoe=spell in SPELL_HITS_MULTIPLE_TARGETS)
+        # wait for gcd
+        if gcd_wait_time:
+            yield self.env.timeout(gcd_wait_time)
 
-        return hit, crit, dmg, cooldown, partial_amount
+    def _arcane_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
+        # Arcane spells don't have special on-resolve effects currently
+        pass
 
     def _arcane_spell(self,
                       spell: Spell,
@@ -213,20 +280,17 @@ class Druid(Character):
                       on_gcd: bool = True,
                       calculate_cast_time: bool = True):
 
-        hit, crit, dmg, cooldown, partial_amount = yield from self._spell(spell=spell,
-                                                                          damage_type=DamageType.ARCANE,
-                                                                          talent_school=TalentSchool.Balance,
-                                                                          min_dmg=min_dmg,
-                                                                          max_dmg=max_dmg,
-                                                                          base_cast_time=base_cast_time,
-                                                                          crit_modifier=crit_modifier,
-                                                                          cooldown=cooldown,
-                                                                          on_gcd=on_gcd,
-                                                                          calculate_cast_time=calculate_cast_time)
-
-        # handle gcd
-        if cooldown:
-            yield self.env.timeout(cooldown)
+        yield from self._spell(spell=spell,
+                               damage_type=DamageType.ARCANE,
+                               talent_school=TalentSchool.Balance,
+                               min_dmg=min_dmg,
+                               max_dmg=max_dmg,
+                               base_cast_time=base_cast_time,
+                               crit_modifier=crit_modifier,
+                               cooldown=cooldown,
+                               on_gcd=on_gcd,
+                               resolved_callback=self._arcane_spell_resolved,
+                               calculate_cast_time=calculate_cast_time)
 
     def _starfire(self):
         # use rank 2 to get full spell coefficient
@@ -255,6 +319,10 @@ class Druid(Character):
                                       base_cast_time=casting_time,
                                       crit_modifier=crit_modifier)
 
+    def _nature_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
+        # Nature spells don't have special on-resolve effects currently
+        pass
+
     def _nature_spell(self,
                       spell: Spell,
                       min_dmg: int,
@@ -265,20 +333,17 @@ class Druid(Character):
                       on_gcd: bool = True,
                       calculate_cast_time: bool = True):
 
-        hit, crit, dmg, cooldown, partial_amount = yield from self._spell(spell=spell,
-                                                                          damage_type=DamageType.NATURE,
-                                                                          talent_school=TalentSchool.Balance,
-                                                                          min_dmg=min_dmg,
-                                                                          max_dmg=max_dmg,
-                                                                          base_cast_time=base_cast_time,
-                                                                          crit_modifier=crit_modifier,
-                                                                          cooldown=cooldown,
-                                                                          on_gcd=on_gcd,
-                                                                          calculate_cast_time=calculate_cast_time)
-
-        # handle gcd
-        if cooldown:
-            yield self.env.timeout(cooldown)
+        yield from self._spell(spell=spell,
+                               damage_type=DamageType.NATURE,
+                               talent_school=TalentSchool.Balance,
+                               min_dmg=min_dmg,
+                               max_dmg=max_dmg,
+                               base_cast_time=base_cast_time,
+                               crit_modifier=crit_modifier,
+                               cooldown=cooldown,
+                               on_gcd=on_gcd,
+                               resolved_callback=self._nature_spell_resolved,
+                               calculate_cast_time=calculate_cast_time)
 
     def _wrath(self):
         # use rank 2 to get full spell coefficient
@@ -340,10 +405,9 @@ class Druid(Character):
             self.print(f"{spell.value} {description} RESIST")
         else:
             if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
-                self.env.process(self._check_for_procs(
+                self._check_for_procs(
                     spell=spell,
-                    damage_type=DamageType.SHADOW,
-                    delay=spell in SPELL_HAS_TRAVEL_TIME))
+                    damage_type=DamageType.SHADOW)
 
             self.print(f"{spell.value} {description}")
             if spell == Spell.INSECT_SWARM:

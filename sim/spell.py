@@ -146,21 +146,6 @@ SPELL_TRIGGERS_ON_HIT = {
     Spell.ANCIENT_ACCORD: False  # Sigil of Ancient Accord
 }
 
-SPELL_HAS_TRAVEL_TIME = {
-    # Warlock
-    Spell.SHADOWBOLT: True,
-
-    # Druid
-    Spell.WRATH: True,
-
-    # Mage
-    Spell.ARCANE_MISSILE: True,
-    Spell.FIREBALL: True,
-    Spell.PYROBLAST: True,
-    Spell.FROSTBOLT: True,
-    Spell.ICICLE: True,
-}
-
 SPELL_PROJECTILE_SPEED = {
     # Warlock
     Spell.SHADOWBOLT: 20.0,

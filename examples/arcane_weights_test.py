@@ -3,18 +3,18 @@ from _example_imports import *
 mages = []
 num_mages = 5
 
-control_sp = 300
-control_crit = 18
-control_hit = 13
+control_sp = 1100
+control_crit = 45
+control_hit = 15
 control_haste = 2
 
 equipped_items = EquippedItems(
     ornate_bloodstone_dagger=False,
-    wrath_of_cenarius=False,
-    true_band_of_sulfuras=False
+    wrath_of_cenarius=True,
+    true_band_of_sulfuras=True
 )
-options = MageOptions(
-)
+options = MageOptions()
+
 for i in range(num_mages):
     fm = None
     if i == 0:

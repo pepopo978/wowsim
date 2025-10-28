@@ -542,10 +542,9 @@ class Mage(Character):
             self.print(f"{spell.value} {description} {partial_desc} **{dmg}**")
 
         if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
-            self.env.process(self._check_for_procs(
+            self._check_for_procs(
                 spell=spell,
-                damage_type=damage_type,
-                delay=False))
+                damage_type=damage_type)
 
         if (hit and
                 self.opts.fullt2 and

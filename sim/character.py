@@ -247,10 +247,8 @@ class Character:
     def _get_crit_multiplier(self, talent_school: TalentSchool, damage_type: DamageType):
         return 1.5 + self.damage_type_crit_mult[damage_type]
 
-    def _check_for_procs(self, spell: Spell, damage_type: DamageType, delay: bool):
+    def _check_for_procs(self, spell: Spell, damage_type: DamageType):
         if self.item_proc_handler:
-            if delay:
-                yield self.env.timeout(0.5)
             self.item_proc_handler.check_for_procs(self.env.now, spell, damage_type)
 
     def roll_partial(self, is_dot: bool, is_binary: bool):

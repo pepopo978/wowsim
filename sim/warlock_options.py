@@ -3,6 +3,8 @@ from sim.decorators import simoption
 
 @dataclass(kw_only=True)
 class WarlockOptions:
+    distance_from_mob: int = simoption("Distance From Mob", default=25, spec=None)
+
     permanent_curse: bool = simoption("Assume curse is always up", default=True)
     firestone: bool = simoption("2% fire crit chance", default=False)
     crit_dmg_bonus_35: bool = simoption("10% crit damage bonus", default=False)

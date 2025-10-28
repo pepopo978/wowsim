@@ -9,7 +9,7 @@ from sim.equipped_items import EquippedItems
 from sim.fire_dots import ImmolateDot
 from sim.shadow_dots import CorruptionDot, CurseOfAgonyDot, SiphonLifeDot
 from sim.spell import Spell, SPELL_COEFFICIENTS, SPELL_HITS_MULTIPLE_TARGETS, SPELL_TRIGGERS_ON_HIT, \
-    SPELL_HAS_TRAVEL_TIME
+    SPELL_PROJECTILE_SPEED
 from sim.spell_school import DamageType
 from sim.talent_school import TalentSchool
 from sim.warlock_options import WarlockOptions
@@ -132,30 +132,23 @@ class Warlock(Character):
 
         return int(dmg)
 
-    # caller must handle any gcd cooldown
-    def _spell(self,
-               spell: Spell,
-               damage_type: DamageType,
-               talent_school: TalentSchool,
-               min_dmg: int,
-               max_dmg: int,
-               base_cast_time: float,
-               crit_modifier: float,
-               custom_gcd: float | None,
-               on_gcd: bool,
-               calculate_cast_time: bool = True):
+    # resolve damage when spell reaches the target
+    def _spell_resolve(self,
+                       travel_time: float,
+                       spell: Spell,
+                       damage_type: DamageType,
+                       talent_school: TalentSchool,
+                       min_dmg: int,
+                       max_dmg: int,
+                       crit_modifier: float,
+                       casting_time: float,
+                       gcd_wait_time: float,
+                       resolved_callback):
 
-        casting_time = self._get_cast_time(base_cast_time, damage_type) if calculate_cast_time else base_cast_time
-
-        gcd = custom_gcd if custom_gcd is not None else self.env.GCD
-        gcd_wait_time = 0
-
-        # account for gcd
-        if on_gcd and casting_time < gcd:
-            gcd_wait_time = gcd - casting_time if casting_time > self.lag else gcd
+        if travel_time:
+            yield self.env.timeout(travel_time)
 
         hit = self._roll_hit(self._get_hit_chance(spell), damage_type)
-
         crit = False
         dmg = 0
 
@@ -176,12 +169,12 @@ class Warlock(Character):
             dmg = int(dmg * partial_amount)
             partial_desc = f"({int(partial_amount * 100)}% partial)"
 
-        if casting_time:
-            yield self.env.timeout(casting_time)
-
         description = ""
         if self.env.print:
-            description = f"({round(casting_time, 2)} cast)"
+            if travel_time:
+                description = f"({round(travel_time, 2)} travel)"
+            else:
+                description = f"({round(casting_time, 2)} cast)"
             if gcd_wait_time:
                 description += f" ({round(gcd_wait_time, 2)} gcd)"
 
@@ -207,23 +200,16 @@ class Warlock(Character):
                     self.env.debuffs.improved_shadow_bolt.refresh(self)
 
         if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
-            self.env.process(self._check_for_procs(
+            self._check_for_procs(
                 spell=spell,
-                damage_type=damage_type,
-                delay=spell in SPELL_HAS_TRAVEL_TIME))
+                damage_type=damage_type)
 
         if hit and self.cds.zhc.is_active():
             self.cds.zhc.use_charge()
 
-        if spell == Spell.SOUL_FIRE:
-            self.soul_fire_cd.activate()
-
-        if spell == Spell.CONFLAGRATE:
-            self.conflagrate_cd.activate()
-
         if hit and spell == Spell.CORRUPTION:
             # avoid calling register_spell_dmg as dots will register already
-            self.env.debuffs.add_dot(CorruptionDot, self, max(base_cast_time, self.env.GCD))
+            self.env.debuffs.add_dot(CorruptionDot, self, max(casting_time, self.env.GCD))
         elif hit and spell == Spell.IMMOLATE:
             # avoid calling register_spell_dmg as dots will register already
             self.env.debuffs.add_dot(ImmolateDot, self, 0)
@@ -243,7 +229,79 @@ class Warlock(Character):
                 cast_time=round(casting_time + gcd_wait_time, 2),
                 aoe=spell in SPELL_HITS_MULTIPLE_TARGETS)
 
-        return hit, crit, dmg, gcd_wait_time, partial_amount
+        if resolved_callback:
+            resolved_callback(spell, hit, crit, dmg, partial_amount)
+        else:
+            raise Exception("missing spell resolved callback")
+
+    # caller must handle any gcd cooldown
+    # handle spell cast
+    def _spell(self,
+               spell: Spell,
+               damage_type: DamageType,
+               talent_school: TalentSchool,
+               min_dmg: int,
+               max_dmg: int,
+               base_cast_time: float,
+               crit_modifier: float,
+               custom_gcd: float | None,
+               on_gcd: bool,
+               resolved_callback,
+               calculate_cast_time: bool = True):
+
+        casting_time = self._get_cast_time(base_cast_time, damage_type) if calculate_cast_time else base_cast_time
+
+        gcd = custom_gcd if custom_gcd is not None else self.env.GCD
+        gcd_wait_time = 0
+
+        # account for gcd
+        if on_gcd and casting_time < gcd:
+            gcd_wait_time = gcd - casting_time if casting_time > self.lag else gcd
+
+        # wait for cast
+        if casting_time:
+            yield self.env.timeout(casting_time)
+
+        if spell in SPELL_PROJECTILE_SPEED:
+            self.print(f"{spell.value} ({round(casting_time, 2)} cast)")
+            # trigger spell resolve when it hits the target
+            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+            self.env.process(
+                self._spell_resolve(
+                    travel_time=travel_time,
+                    spell=spell,
+                    damage_type=damage_type,
+                    talent_school=talent_school,
+                    min_dmg=min_dmg,
+                    max_dmg=max_dmg,
+                    crit_modifier=crit_modifier,
+                    casting_time=casting_time,
+                    gcd_wait_time=gcd_wait_time,
+                    resolved_callback=resolved_callback)
+            )
+        else:
+            # spell hits target immediately
+            yield from self._spell_resolve(
+                travel_time=0,
+                spell=spell,
+                damage_type=damage_type,
+                talent_school=talent_school,
+                min_dmg=min_dmg,
+                max_dmg=max_dmg,
+                crit_modifier=crit_modifier,
+                casting_time=casting_time,
+                gcd_wait_time=gcd_wait_time,
+                resolved_callback=resolved_callback)
+
+        # wait for gcd
+        if gcd_wait_time:
+            yield self.env.timeout(gcd_wait_time)
+
+    def _fire_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
+        if spell == Spell.SOUL_FIRE:
+            self.soul_fire_cd.activate()
+        elif spell == Spell.CONFLAGRATE:
+            self.conflagrate_cd.activate()
 
     def _fire_spell(self,
                     spell: Spell,
@@ -254,19 +312,20 @@ class Warlock(Character):
                     custom_gcd: float | None = None,
                     on_gcd: bool = True):
 
-        hit, crit, dmg, effective_gcd, partial_amount = yield from self._spell(spell=spell,
-                                                                               damage_type=DamageType.FIRE,
-                                                                               talent_school=TalentSchool.Destruction,
-                                                                               min_dmg=min_dmg,
-                                                                               max_dmg=max_dmg,
-                                                                               base_cast_time=base_cast_time,
-                                                                               crit_modifier=crit_modifier,
-                                                                               custom_gcd=custom_gcd,
-                                                                               on_gcd=on_gcd)
+        yield from self._spell(spell=spell,
+                               damage_type=DamageType.FIRE,
+                               talent_school=TalentSchool.Destruction,
+                               min_dmg=min_dmg,
+                               max_dmg=max_dmg,
+                               base_cast_time=base_cast_time,
+                               crit_modifier=crit_modifier,
+                               custom_gcd=custom_gcd,
+                               on_gcd=on_gcd,
+                               resolved_callback=self._fire_spell_resolved)
 
-        # handle gcd
-        if effective_gcd:
-            yield self.env.timeout(effective_gcd)
+    def _shadow_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
+        # Shadow spells don't have special on-resolve effects currently
+        pass
 
     def _shadow_spell(self,
                       spell: Spell,
@@ -278,19 +337,17 @@ class Warlock(Character):
                       custom_gcd: float | None = None,
                       on_gcd: bool = True,
                       calculate_cast_time: bool = True):
-        hit, crit, dmg, effective_gcd, partial_amount = yield from self._spell(spell=spell,
-                                                                               damage_type=DamageType.SHADOW,
-                                                                               talent_school=talent_school,
-                                                                               min_dmg=min_dmg,
-                                                                               max_dmg=max_dmg,
-                                                                               base_cast_time=base_cast_time,
-                                                                               crit_modifier=crit_modifier,
-                                                                               custom_gcd=custom_gcd,
-                                                                               on_gcd=on_gcd,
-                                                                               calculate_cast_time=calculate_cast_time)
-        # handle gcd
-        if effective_gcd:
-            yield self.env.timeout(effective_gcd)
+        yield from self._spell(spell=spell,
+                               damage_type=DamageType.SHADOW,
+                               talent_school=talent_school,
+                               min_dmg=min_dmg,
+                               max_dmg=max_dmg,
+                               base_cast_time=base_cast_time,
+                               crit_modifier=crit_modifier,
+                               custom_gcd=custom_gcd,
+                               on_gcd=on_gcd,
+                               resolved_callback=self._shadow_spell_resolved,
+                               calculate_cast_time=calculate_cast_time)
 
     def _shadow_dot(self,
                     spell: Spell,
@@ -327,10 +384,9 @@ class Warlock(Character):
                 cast_time=max(casting_time, self.env.GCD))
         else:
             if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
-                self.env.process(self._check_for_procs(
+                self._check_for_procs(
                     spell=spell,
-                    damage_type=DamageType.SHADOW,
-                    delay=spell in SPELL_HAS_TRAVEL_TIME))
+                    damage_type=DamageType.SHADOW)
 
             self.print(f"{spell.value} {description}")
             if spell == Spell.CURSE_OF_SHADOW:
@@ -374,10 +430,9 @@ class Warlock(Character):
         self.print(f"{spell.value} {description} {dmg}")
 
         if SPELL_TRIGGERS_ON_HIT.get(spell, False):
-            self.env.process(self._check_for_procs(
+            self._check_for_procs(
                 spell=spell,
-                damage_type=damage_type,
-                delay=spell in SPELL_HAS_TRAVEL_TIME))
+                damage_type=damage_type)
 
         self.env.meter.register_dot_dmg(
             char_name=self.name,
@@ -520,10 +575,9 @@ class Warlock(Character):
             yield self.env.timeout(self.env.GCD)
             return
         else:
-            self.env.process(self._check_for_procs(
+            self._check_for_procs(
                 spell=Spell.DRAIN_SOUL_CHANNEL,
-                damage_type=DamageType.SHADOW,
-                delay=Spell.DRAIN_SOUL_CHANNEL in SPELL_HAS_TRAVEL_TIME))
+                damage_type=DamageType.SHADOW)
             self.print(f"{Spell.DRAIN_SOUL_CHANNEL.value}")
 
         num_ticks = 6
@@ -571,10 +625,9 @@ class Warlock(Character):
             yield self.env.timeout(self.env.GCD)
             return
         else:
-            self.env.process(self._check_for_procs(
+            self._check_for_procs(
                 spell=Spell.DARK_HARVEST_CHANNEL,
-                damage_type=DamageType.SHADOW,
-                delay=Spell.DARK_HARVEST_CHANNEL in SPELL_HAS_TRAVEL_TIME))
+                damage_type=DamageType.SHADOW)
             self.print(f"{Spell.DARK_HARVEST_CHANNEL.value}")
 
         num_ticks = 8
