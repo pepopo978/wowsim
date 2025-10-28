@@ -6,10 +6,12 @@ class MageOptions:
     fullt2: bool = simoption("Full T2 8-set bonus (10% instant cast chance on main spells)", default=False, spec=None)
     apply_undead_bonus: bool = simoption("Apply Undead Bonus (+2% damage vs undead)", default=False, spec=None)
     t35_3_set: bool = simoption("T3.5 3-set bonus 10% chance for aoe spells to deal 15% more dmg", default=False, spec=None)
+    distance_from_mob: int = simoption("Distance From Mob", default=25, spec=None)
 
     # Fire
     drop_suboptimal_ignites: bool = simoption("Drop suboptimal ignites (cast frostbolt to drop bad ignite)", default=False, spec="Fire")
     remaining_seconds_for_ignite_extend: int = simoption("Seconds remaining for ignite extension", default=3, spec="Fire")
+    min_ignite_stacks_to_extend: int = simoption("Minimum Ignite stacks to start extending", default=3, spec="Fire")
     extend_ignite_with_fire_blast: bool = simoption("Extend ignite with Fire Blast", default=False, spec="Fire")
     extend_ignite_with_scorch: bool = simoption("Extend ignite with Scorch", default=False, spec="Fire")
     pyro_on_t2_proc: bool = simoption("Cast Pyroblast on T2 proc", default=True, spec="Fire")
@@ -26,8 +28,8 @@ class MageOptions:
     use_cold_snap_for_nova: bool = simoption("Use Cold Snap to reset Frost Nova", default=True, spec="Frost")
 
     # Arcane
-    use_presence_of_mind_on_cd: bool = simoption("Use Presence of Mind on cooldown", default=True, spec="Arcane")
-    extra_second_arcane_missile: bool = simoption("Extra second on Arcane Missiles (effect on some belts)", default=False, spec="Arcane")
+    use_presence_of_mind_on_cd: bool = simoption("Use Presence of Mind on cooldown", default=False, spec="Arcane")
+    extra_second_arcane_missile: bool = simoption("Extra second on Arcane Missiles (effect on some belts)", default=True, spec="Arcane")
     interrupt_arcane_missiles_for_rupture: bool = simoption("Interrupt Arcane Missiles early for Rupture", default=True, spec="Arcane")
     interrupt_arcane_missiles_for_surge: bool = simoption("Interrupt Arcane Missiles early for Surge", default=True, spec="Arcane")
     interrupt_arcane_missiles_for_sulfuras_proc: bool = simoption("Interrupt Arcane Missiles early for Sulfuras haste proc", default=True, spec="Arcane")

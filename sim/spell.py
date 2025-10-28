@@ -150,14 +150,30 @@ SPELL_HAS_TRAVEL_TIME = {
     # Warlock
     Spell.SHADOWBOLT: True,
 
+    # Druid
+    Spell.WRATH: True,
+
     # Mage
     Spell.ARCANE_MISSILE: True,
     Spell.FIREBALL: True,
     Spell.PYROBLAST: True,
     Spell.FROSTBOLT: True,
+    Spell.ICICLE: True,
+}
+
+SPELL_PROJECTILE_SPEED = {
+    # Warlock
+    Spell.SHADOWBOLT: 20.0,
 
     # Druid
-    Spell.WRATH: True,
+    Spell.WRATH: 20.0,
+
+    # Mage
+    Spell.ARCANE_MISSILE: 20.0,
+    Spell.FIREBALL: 24.0,
+    Spell.PYROBLAST: 24.0,
+    Spell.FROSTBOLT: 28.0,
+    Spell.ICICLE: 40.0,
 }
 
 SPELL_HITS_MULTIPLE_TARGETS = {

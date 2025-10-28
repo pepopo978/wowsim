@@ -1,19 +1,23 @@
 from _example_imports import *
 
-mages = []
-num_mages = 1
+base_sp = 1000
+base_crit = 40
+base_hit = 14
+base_haste = 4
 
-for i in range(num_mages):
-    fm = Mage(name=f'test', sp=1000, crit=35, hit=16,
-              tal=FireMageTalents(),
-              opts=MageOptions(
-                  extend_ignite_with_scorch=True
-              ),
-              equipped_items=EquippedItems(endless_gulch=False, true_band_of_sulfuras=True, unceasing_frost=True))
-    fm.smart_scorch_and_fireblast(cds=CooldownUsages(combustion=10, mqg=10))
-    mages.append(fm)
+duration=120
+
+fm = Mage(name=f'mqg', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+          tal=FireMageTalents(),
+          opts=MageOptions(),
+          equipped_items=EquippedItems())
+fm.spam_arcane_explosion(cds=CooldownUsages(mqg=12))
+
+# sim = Simulation(characters=[fm])
+# sim.run(iterations=20000, duration=duration, print_casts=False)
+# sim.detailed_report()
 
 env = Environment()
-env.add_characters(mages)
+env.add_characters([fm])
 env.run(until=180)
 env.meter.detailed_report()

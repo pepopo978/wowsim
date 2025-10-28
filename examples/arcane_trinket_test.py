@@ -52,36 +52,36 @@ m = Mage(name=f'eye of dim', sp=base_sp, crit=base_crit + 3, hit=base_hit, haste
 set_rotation(m, cds=CooldownUsages(arcane_power=5))
 mages.append(m)
 
-# m = Mage(name=f'gulch', sp=base_sp + 30, crit=base_crit, hit=base_hit, haste=base_haste,
-#          tal=ArcaneMageTalents(),
-#          opts=MageOptions(),
-#          equipped_items=EquippedItems(
-#              ornate_bloodstone_dagger=False,
-#              wrath_of_cenarius=True,
-#              endless_gulch=True,
-#          ))
-# m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5))
-# mages.append(m)
+m = Mage(name=f'gulch', sp=base_sp + 30, crit=base_crit, hit=base_hit, haste=base_haste,
+         tal=ArcaneMageTalents(),
+         opts=MageOptions(),
+         equipped_items=EquippedItems(
+             ornate_bloodstone_dagger=False,
+             wrath_of_cenarius=True,
+             endless_gulch=True,
+         ))
+m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5))
+mages.append(m)
 
-# m = Mage(name=f'tear', sp=base_sp + 44, crit=base_crit, hit=base_hit + 2, haste=base_haste,
-#           tal=ArcaneMageTalents(),
-#           opts=MageOptions(),
-#           equipped_items=EquippedItems(
-#               ornate_bloodstone_dagger=False,
-#               wrath_of_cenarius=True,
-#           ))
-# m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5))
-# mages.append(m)
+m = Mage(name=f'tear', sp=base_sp + 44, crit=base_crit, hit=base_hit + 2, haste=base_haste,
+          tal=ArcaneMageTalents(),
+          opts=MageOptions(),
+          equipped_items=EquippedItems(
+              ornate_bloodstone_dagger=False,
+              wrath_of_cenarius=True,
+          ))
+m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5))
+mages.append(m)
 
-# m = Mage(name=f'toep', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
-#           tal=ArcaneMageTalents(),
-#           opts=MageOptions(),
-#           equipped_items=EquippedItems(
-#               ornate_bloodstone_dagger=False,
-#               wrath_of_cenarius=True,
-#           ))
-# m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5, toep=5))
-# mages.append(m)
+m = Mage(name=f'toep', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+          tal=ArcaneMageTalents(),
+          opts=MageOptions(),
+          equipped_items=EquippedItems(
+              ornate_bloodstone_dagger=False,
+              wrath_of_cenarius=True,
+          ))
+m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5, toep=5))
+mages.append(m)
 
 m = Mage(name=f'mqg', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
          tal=ArcaneMageTalents(),
@@ -114,25 +114,25 @@ m = Mage(name=f'sigil', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_has
 set_rotation(m, cds=CooldownUsages(arcane_power=5))
 mages.append(m)
 
-# m = Mage(name=f'shard of nightmare', sp=base_sp + 36, crit=base_crit, hit=base_hit + 1, haste=base_haste,
-#           tal=ArcaneMageTalents(),
-#           opts=MageOptions(),
-#           equipped_items=EquippedItems(
-#               ornate_bloodstone_dagger=False,
-#               wrath_of_cenarius=True,
-#           ))
-# m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5))
-# mages.append(m)
+m = Mage(name=f'shard of nightmare', sp=base_sp + 36, crit=base_crit, hit=base_hit + 1, haste=base_haste,
+          tal=ArcaneMageTalents(),
+          opts=MageOptions(),
+          equipped_items=EquippedItems(
+              ornate_bloodstone_dagger=False,
+              wrath_of_cenarius=True,
+          ))
+m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5))
+mages.append(m)
 
-# m = Mage(name=f'zandalarian hero charm', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
-#           tal=ArcaneMageTalents(),
-#           opts=MageOptions(),
-#           equipped_items=EquippedItems(
-#               ornate_bloodstone_dagger=False,
-#               wrath_of_cenarius=True,
-#           ))
-# m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5, zhc=5))
-# mages.append(m)
+m = Mage(name=f'zandalarian', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+          tal=ArcaneMageTalents(),
+          opts=MageOptions(),
+          equipped_items=EquippedItems(
+              ornate_bloodstone_dagger=False,
+              wrath_of_cenarius=True,
+          ))
+m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5, zhc=5))
+mages.append(m)
 
 
 

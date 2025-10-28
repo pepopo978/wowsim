@@ -11,7 +11,7 @@ from sim.mage_options import MageOptions
 from sim.mage_rotation_cooldowns import *
 from sim.mage_talents import MageTalents
 from sim.spell import Spell, SPELL_COEFFICIENTS, SPELL_TRIGGERS_ON_HIT, SPELL_HITS_MULTIPLE_TARGETS, \
-    SPELL_HAS_TRAVEL_TIME
+    SPELL_PROJECTILE_SPEED
 from sim.spell_school import DamageType
 from sim.talent_school import TalentSchool
 
@@ -331,12 +331,15 @@ class Mage(Character):
         yield from self._random_delay(delay)
         while True:
             self._use_cds(cds)
-            if self.env.debuffs.fire_vuln_stacks < 5 or self.env.debuffs.fire_vuln_timer <= 4.5:
-                yield from self._scorch()
-            elif self.fire_blast_cd.usable:
-                yield from self._fire_blast()
-            else:
-                yield from self._fireball()
+            if not self.has_trinket_or_cooldown_haste():
+                if self.fire_blast_cd.usable:
+                    yield from self._fire_blast()
+                    continue
+                elif self.env.debuffs.fire_vuln_stacks < 5 or self.env.debuffs.fire_vuln_timer <= 4.5:
+                    yield from self._scorch()
+                    continue
+
+            yield from self._fireball()
 
     def _smart_scorch_and_fireblast_and_surge(self, cds: CooldownUsages = CooldownUsages(), delay=2):
         """Same as above except fireblast on cd"""
@@ -344,10 +347,10 @@ class Mage(Character):
         yield from self._random_delay(delay)
         while True:
             self._use_cds(cds)
-            if self.env.debuffs.fire_vuln_stacks < 5 or self.env.debuffs.fire_vuln_timer <= 4.5:
-                yield from self._scorch()
-            elif self.fire_blast_cd.usable:
+            if self.fire_blast_cd.usable:
                 yield from self._fire_blast()
+            elif self.env.debuffs.fire_vuln_stacks < 5 or self.env.debuffs.fire_vuln_timer <= 4.5:
+                yield from self._scorch()
             elif self.arcane_surge_cd.usable and not self.has_trinket_or_cooldown_haste():
                 yield from self._arcane_surge()
             else:
@@ -426,13 +429,11 @@ class Mage(Character):
         return int(dmg)
 
     def check_for_ignite_extend(self, spell: Spell):
-        has_5_stack_scorch = self.env.debuffs.fire_vuln_stacks == 5
-        has_5_stack_ignite = self.env.debuffs.ignite and self.env.debuffs.ignite.stacks == 5
+        has_ignite_stack = self.env.debuffs.ignite and self.env.debuffs.ignite.stacks == 5
 
         has_ignite_extend_option = self.opts.extend_ignite_with_fire_blast or self.opts.extend_ignite_with_scorch
 
-        return (has_5_stack_scorch and
-                has_5_stack_ignite and
+        return (has_ignite_stack and
                 has_ignite_extend_option and
                 spell not in (
                     Spell.FIREBLAST,
@@ -453,31 +454,21 @@ class Mage(Character):
 
         return False
 
-    # caller must handle any gcd cooldown
-    def _spell(self,
-               spell: Spell,
-               damage_type: DamageType,
-               talent_school: TalentSchool,
-               min_dmg: int,
-               max_dmg: int,
-               base_cast_time: float,
-               crit_modifier: float,
-               custom_gcd: float | None,
-               on_gcd: bool,
-               calculate_cast_time: bool = True):
+    # resolve damage when spell reaches the target
+    def _spell_resolve(self,
+                       travel_time: float,
+                       spell: Spell,
+                       damage_type: DamageType,
+                       talent_school: TalentSchool,
+                       min_dmg: int,
+                       max_dmg: int,
+                       crit_modifier: float,
+                       casting_time: float,
+                       gcd_wait_time: float,
+                       resolved_callback):
 
-        casting_time = self._get_cast_time(base_cast_time, damage_type) if calculate_cast_time else base_cast_time
-        if self._t2_8set_proc and calculate_cast_time:
-            casting_time = self.lag
-            self._t2_8set_proc = False
-            self.print("T2 proc used")
-
-        gcd = custom_gcd if custom_gcd is not None else self.env.GCD
-        gcd_wait_time = 0
-
-        # account for gcd
-        if on_gcd and casting_time < gcd:
-            gcd_wait_time = gcd - casting_time if casting_time > self.lag else gcd
+        if travel_time:
+            yield self.env.timeout(travel_time)
 
         hit = self._roll_hit(self._get_hit_chance(spell),
                              damage_type) if spell != Spell.ARCANE_SURGE else True  # arcane surge always hits
@@ -507,7 +498,8 @@ class Mage(Character):
                 dmg *= 1.20
                 arcane_rupture_applied = True
 
-            if self.opts.t35_3_set and spell in {Spell.FLAMESTRIKER6, Spell.CONE_OF_COLD, Spell.FROST_NOVA, Spell.BLASTWAVE, Spell.ARCANE_EXPLOSION}:
+            if self.opts.t35_3_set and spell in {Spell.FLAMESTRIKER6, Spell.CONE_OF_COLD, Spell.FROST_NOVA,
+                                                 Spell.BLASTWAVE, Spell.ARCANE_EXPLOSION}:
                 if self._roll_proc(10):
                     dmg *= 1.15
                     self.print(f"{spell.value} T3 3-set proc")
@@ -528,12 +520,12 @@ class Mage(Character):
             if self.opts.t3_8_set:
                 self._t3_arcane_8set_proc_time = self.env.now
 
-        if casting_time:
-            yield self.env.timeout(casting_time)
-
         description = ""
         if self.env.print:
-            description = f"({round(casting_time, 2)} cast)"
+            if travel_time:
+                description = f"({round(travel_time, 2)} travel)"
+            else:
+                description = f"({round(casting_time, 2)} cast)"
             if gcd_wait_time:
                 description += f" ({round(gcd_wait_time, 2)} gcd)"
             if arcane_instability_hit:
@@ -553,7 +545,7 @@ class Mage(Character):
             self.env.process(self._check_for_procs(
                 spell=spell,
                 damage_type=damage_type,
-                delay=spell in SPELL_HAS_TRAVEL_TIME))
+                delay=False))
 
         if (hit and
                 self.opts.fullt2 and
@@ -576,37 +568,80 @@ class Mage(Character):
             cast_time=round(casting_time + gcd_wait_time, 2),
             aoe=spell in SPELL_HITS_MULTIPLE_TARGETS)
 
-        return hit, crit, dmg, gcd_wait_time, partial_amount
+        if resolved_callback:
+            resolved_callback(spell, hit, crit, dmg, partial_amount)
+        else:
+            raise Exception("missing spell resolved callback")
 
-    def _arcane_spell(self,
-                      spell: Spell,
-                      min_dmg: int,
-                      max_dmg: int,
-                      base_cast_time: float,
-                      crit_modifier: float,
-                      custom_gcd: float = None,
-                      on_gcd: bool = True,
-                      calculate_cast_time: bool = True):
+    # caller must handle any gcd cooldown
+    # handle spell cast
+    def _spell(self,
+               spell: Spell,
+               damage_type: DamageType,
+               talent_school: TalentSchool,
+               min_dmg: int,
+               max_dmg: int,
+               base_cast_time: float,
+               crit_modifier: float,
+               custom_gcd: float | None,
+               on_gcd: bool,
+               resolved_callback,
+               calculate_cast_time: bool = True):
 
-        # check if we need to extend ignite instead of casting intended spell
-        if self.check_for_ignite_extend(spell):
-            cast_spell = yield from self.extend_ignite()
-            if cast_spell:
-                return
+        casting_time = self._get_cast_time(base_cast_time, damage_type) if calculate_cast_time else base_cast_time
+        if self._t2_8set_proc and calculate_cast_time:
+            casting_time = self.lag
+            self._t2_8set_proc = False
+            self.print("T2 proc used")
 
-        crit_modifier += self.tal.arcane_impact * 2
+        gcd = custom_gcd if custom_gcd is not None else self.env.GCD
+        gcd_wait_time = 0
 
-        hit, crit, dmg, effective_gcd, partial_amount = yield from self._spell(spell=spell,
-                                                                            damage_type=DamageType.ARCANE,
-                                                                            talent_school=TalentSchool.Arcane,
-                                                                            min_dmg=min_dmg,
-                                                                            max_dmg=max_dmg,
-                                                                            base_cast_time=base_cast_time,
-                                                                            crit_modifier=crit_modifier,
-                                                                            custom_gcd=custom_gcd,
-                                                                            on_gcd=on_gcd,
-                                                                            calculate_cast_time=calculate_cast_time)
+        # account for gcd
+        if on_gcd and casting_time < gcd:
+            gcd_wait_time = gcd - casting_time if casting_time > self.lag else gcd
 
+        # wait for cast
+        if casting_time:
+            yield self.env.timeout(casting_time)
+
+        if spell in SPELL_PROJECTILE_SPEED:
+            self.print(f"{spell.value} ({round(casting_time, 2)} cast)")
+            # trigger spell resolve when it hits the target
+            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+            self.env.process(
+                self._spell_resolve(
+                    travel_time=travel_time,
+                    spell=spell,
+                    damage_type=damage_type,
+                    talent_school=talent_school,
+                    min_dmg=min_dmg,
+                    max_dmg=max_dmg,
+                    crit_modifier=crit_modifier,
+                    casting_time=casting_time,
+                    gcd_wait_time=gcd_wait_time,
+                    resolved_callback=resolved_callback)
+            )
+        else:
+            # spell hits target immediately
+            yield from self._spell_resolve(
+                travel_time=0,
+                spell=spell,
+                damage_type=damage_type,
+                talent_school=talent_school,
+                min_dmg=min_dmg,
+                max_dmg=max_dmg,
+                crit_modifier=crit_modifier,
+                casting_time=casting_time,
+                gcd_wait_time=gcd_wait_time,
+                resolved_callback=resolved_callback)
+
+        # wait for gcd
+        if gcd_wait_time:
+            yield self.env.timeout(gcd_wait_time)
+
+
+    def _arcane_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
         if self.tal.resonance_cascade and hit:
             num_duplicates = 0
 
@@ -642,9 +677,35 @@ class Mage(Character):
         elif spell == Spell.ARCANE_RUPTURE:
             self.arcane_rupture_cd.activate()
 
-        # handle gcd
-        if effective_gcd:
-            yield self.env.timeout(effective_gcd)
+    def _arcane_spell(self,
+                      spell: Spell,
+                      min_dmg: int,
+                      max_dmg: int,
+                      base_cast_time: float,
+                      crit_modifier: float,
+                      custom_gcd: float = None,
+                      on_gcd: bool = True,
+                      calculate_cast_time: bool = True):
+
+        # check if we need to extend ignite instead of casting intended spell
+        if self.check_for_ignite_extend(spell):
+            cast_spell = yield from self.extend_ignite()
+            if cast_spell:
+                return
+
+        crit_modifier += self.tal.arcane_impact * 2
+
+        yield from self._spell(spell=spell,
+                               damage_type=DamageType.ARCANE,
+                               talent_school=TalentSchool.Arcane,
+                               min_dmg=min_dmg,
+                               max_dmg=max_dmg,
+                               base_cast_time=base_cast_time,
+                               crit_modifier=crit_modifier,
+                               custom_gcd=custom_gcd,
+                               on_gcd=on_gcd,
+                               resolved_callback=self._arcane_spell_resolved,
+                               calculate_cast_time=calculate_cast_time)
 
     def _arcane_missile(self, casting_time: float = 1):
         dmg = 230
@@ -752,6 +813,48 @@ class Mage(Character):
                                       base_cast_time=casting_time,
                                       crit_modifier=crit_modifier)
 
+
+    def _fire_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
+        if hit:
+            self.cds.combustion.cast_fire_spell()  # only happens on hit
+
+            if spell == Spell.FIREBALL:
+                self.env.debuffs.add_dot(FireballDot, self, 0)
+            elif spell == Spell.PYROBLAST:
+                self.env.debuffs.add_dot(PyroblastDot, self, 0)
+            elif spell == Spell.FLAMESTRIKER4:
+                self.env.debuffs.add_dot(Flamestriker4Dot, self, 0)
+            elif spell == Spell.FLAMESTRIKER5:
+                self.env.debuffs.add_dot(Flamestriker5Dot, self, 0)
+            elif spell == Spell.FLAMESTRIKER6:
+                self.env.debuffs.add_dot(Flamestriker6Dot, self, 0)
+            elif (spell == Spell.SCORCH or spell == Spell.FIREBLAST) and self.tal.fire_vuln:
+                fire_vuln_chance = 100
+                if self.tal.fire_vuln < 3:
+                    fire_vuln_chance = 33 * self.tal.fire_vuln
+                # roll for whether debuff hits
+                if fire_vuln_chance == 100 or self._roll_proc(fire_vuln_chance):
+                    self.env.debuffs.add_fire_vuln()
+
+        if crit:
+            if self.tal.ignite:
+                self.env.debuffs.ignite.refresh(self, dmg, spell, partial_amount < 1, self.tal.ignite)
+
+            # check for hot streak
+            if self.hot_streak and (spell == Spell.FIREBALL or spell == Spell.FIREBLAST):
+                hot_streak_hit = True
+                if self.tal.hot_streak == 1:
+                    hot_streak_hit = self._roll_proc(50)
+
+                if hot_streak_hit:
+                    self.hot_streak.add_stack()
+
+            self.cds.combustion.use_charge()  # only used on crit
+
+        if spell == Spell.FIREBLAST:
+            self.fire_blast_cd.activate()
+
+
     def _fire_spell(self,
                     spell: Spell,
                     min_dmg: int,
@@ -782,60 +885,16 @@ class Mage(Character):
             yield from self._pyroblast(casting_time=1)
             return
 
-        hit, crit, dmg, effective_gcd, partial_amount = yield from self._spell(spell=spell,
-                                                                            damage_type=DamageType.FIRE,
-                                                                            talent_school=TalentSchool.Fire,
-                                                                            min_dmg=min_dmg,
-                                                                            max_dmg=max_dmg,
-                                                                            base_cast_time=base_cast_time,
-                                                                            crit_modifier=crit_modifier,
-                                                                            custom_gcd=custom_gcd,
-                                                                            on_gcd=on_gcd)
-
-        if hit:
-            self.cds.combustion.cast_fire_spell()  # only happens on hit
-
-            if spell == Spell.FIREBALL:
-                self.env.debuffs.add_dot(FireballDot, self, 0)
-            elif spell == Spell.PYROBLAST:
-                self.env.debuffs.add_dot(PyroblastDot, self, 0)
-            elif spell == Spell.FLAMESTRIKER4:
-                self.env.debuffs.add_dot(Flamestriker4Dot, self, 0)
-            elif spell == Spell.FLAMESTRIKER5:
-                self.env.debuffs.add_dot(Flamestriker5Dot, self, 0)
-            elif spell == Spell.FLAMESTRIKER6:
-                self.env.debuffs.add_dot(Flamestriker6Dot, self, 0)
-            elif (spell == Spell.SCORCH or spell == Spell.FIREBLAST) and self.tal.fire_vuln:
-                fire_vuln_chance = 100
-                if self.tal.fire_vuln < 3:
-                    fire_vuln_chance = 33 * self.tal.fire_vuln
-                # roll for whether debuff hits
-                fire_vuln_hit = self._roll_hit(self._get_hit_chance(spell), DamageType.FIRE)
-                if fire_vuln_hit:
-                    if fire_vuln_chance == 100 or self._roll_proc(fire_vuln_chance):
-                        self.env.debuffs.add_fire_vuln()
-
-        if crit:
-            if self.tal.ignite:
-                self.env.debuffs.ignite.refresh(self, dmg, spell, partial_amount < 1, self.tal.ignite)
-
-            # check for hot streak
-            if self.hot_streak and (spell == Spell.FIREBALL or spell == Spell.FIREBLAST):
-                hot_streak_hit = True
-                if self.tal.hot_streak == 1:
-                    hot_streak_hit = self._roll_proc(50)
-
-                if hot_streak_hit:
-                    self.hot_streak.add_stack()
-
-            self.cds.combustion.use_charge()  # only used on crit
-
-        if spell == Spell.FIREBLAST:
-            self.fire_blast_cd.activate()
-
-        # handle gcd
-        if effective_gcd:
-            yield self.env.timeout(effective_gcd)
+        yield from self._spell(spell=spell,
+                               damage_type=DamageType.FIRE,
+                               talent_school=TalentSchool.Fire,
+                               min_dmg=min_dmg,
+                               max_dmg=max_dmg,
+                               base_cast_time=base_cast_time,
+                               crit_modifier=crit_modifier,
+                               custom_gcd=custom_gcd,
+                               on_gcd=on_gcd,
+                               resolved_callback=self._fire_spell_resolved)
 
     def _scorch(self):
         min_dmg = 237
@@ -944,42 +1003,14 @@ class Mage(Character):
                                     base_cast_time=casting_time,
                                     crit_modifier=crit_modifier)
 
-    def _frost_spell(self,
-                     spell: Spell,
-                     min_dmg: int,
-                     max_dmg: int,
-                     base_cast_time: float,
-                     crit_modifier: float,
-                     custom_gcd: float | None = None,
-                     on_gcd: bool = True,
-                     calculate_cast_time: bool = True):
-        # check if we need to extend ignite instead of casting intended spell
-        if self.check_for_ignite_extend(spell):
-            cast_spell = yield from self.extend_ignite()
-            if cast_spell:
-                return
 
-        crit_modifier += self.env.debuffs.wc_stacks * 2  # winters chill added crit (2% per stack)
-
-        hit, crit, dmg, effective_gcd, partial_amount = yield from self._spell(spell=spell,
-                                                                            damage_type=DamageType.FROST,
-                                                                            talent_school=TalentSchool.Frost,
-                                                                            min_dmg=min_dmg,
-                                                                            max_dmg=max_dmg,
-                                                                            base_cast_time=base_cast_time,
-                                                                            crit_modifier=crit_modifier,
-                                                                            custom_gcd=custom_gcd,
-                                                                            on_gcd=on_gcd,
-                                                                            calculate_cast_time=calculate_cast_time)
-
+    def _frost_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
         if hit:
             if self.tal.winters_chill and spell != Spell.FROST_NOVA:
                 # roll for whether debuff hits
-                winters_chill_hit = self._roll_hit(self._get_hit_chance(spell), DamageType.FROST)
-                if winters_chill_hit:
-                    winters_chill_proc = self.tal.winters_chill * 20
-                    if winters_chill_proc == 100 or self._roll_proc(winters_chill_proc):
-                        self.env.debuffs.add_winters_chill_stack()
+                winters_chill_proc = self.tal.winters_chill * 20
+                if winters_chill_proc == 100 or self._roll_proc(winters_chill_proc):
+                    self.env.debuffs.add_winters_chill_stack()
 
             if self.tal.flash_freeze:
                 flash_freeze_hit = False
@@ -1010,9 +1041,34 @@ class Mage(Character):
         elif spell == Spell.CONE_OF_COLD:
             self.cone_of_cold_cd.activate()
 
-        # handle gcd
-        if effective_gcd:
-            yield self.env.timeout(effective_gcd)
+    def _frost_spell(self,
+                     spell: Spell,
+                     min_dmg: int,
+                     max_dmg: int,
+                     base_cast_time: float,
+                     crit_modifier: float,
+                     custom_gcd: float | None = None,
+                     on_gcd: bool = True,
+                     calculate_cast_time: bool = True):
+        # check if we need to extend ignite instead of casting intended spell
+        if self.check_for_ignite_extend(spell):
+            cast_spell = yield from self.extend_ignite()
+            if cast_spell:
+                return
+
+        crit_modifier += self.env.debuffs.wc_stacks * 2  # winters chill added crit (2% per stack)
+
+        yield from self._spell(spell=spell,
+                               damage_type=DamageType.FROST,
+                               talent_school=TalentSchool.Frost,
+                               min_dmg=min_dmg,
+                               max_dmg=max_dmg,
+                               base_cast_time=base_cast_time,
+                               crit_modifier=crit_modifier,
+                               custom_gcd=custom_gcd,
+                               on_gcd=on_gcd,
+                               resolved_callback=self._frost_spell_resolved,
+                               calculate_cast_time=calculate_cast_time)
 
     def _frostbolt(self):
         min_dmg = 515
