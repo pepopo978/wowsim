@@ -37,6 +37,8 @@ def run_simulation(args, chunk_range):
             'debuff_uptime': defaultdict(float),
             'partial_resists': defaultdict(list),
             'resists': defaultdict(list),
+            'missile_count': defaultdict(list),
+            'rupture_missile_count': defaultdict(list),
             'total_spell_dmg': [],
             'total_dot_dmg': [],
             'total_ignite_dmg': [],
@@ -93,6 +95,11 @@ def run_simulation(args, chunk_range):
                 char_name = character.name
                 chunk_results['partial_resists'][char_name].append(character.num_partials)
                 chunk_results['resists'][char_name].append(character.num_resists)
+
+                # Track missile counts if character has them
+                if hasattr(character, 'missile_count'):
+                    chunk_results['missile_count'][char_name].append(character.missile_count)
+                    chunk_results['rupture_missile_count'][char_name].append(character.rupture_missile_count)
 
                 if char_name not in chunk_results['per_spell_data']:
                     chunk_results['per_spell_data'][char_name] = env.meter.per_spell_data(char_name)
@@ -290,6 +297,8 @@ class Simulation:
                 'debuff_uptime': defaultdict(list),
                 'partial_resists': defaultdict(list),
                 'resists': defaultdict(list),
+                'missile_count': defaultdict(list),
+                'rupture_missile_count': defaultdict(list),
                 'total_spell_dmg': [None] * iterations,
                 'total_dot_dmg': [None] * iterations,
                 'total_ignite_dmg': [None] * iterations,
@@ -343,6 +352,11 @@ class Simulation:
                     char_name = character.name
                     self.results['partial_resists'][char_name].append(character.num_partials)
                     self.results['resists'][char_name].append(character.num_resists)
+
+                    # Track missile counts if character has them
+                    if hasattr(character, 'missile_count'):
+                        self.results['missile_count'][char_name].append(character.missile_count)
+                        self.results['rupture_missile_count'][char_name].append(character.rupture_missile_count)
 
                     if char_name not in self.results['per_spell_data']:
                         self.results['per_spell_data'][char_name] = env.meter.per_spell_data(char_name)
@@ -410,6 +424,8 @@ class Simulation:
             'buff_uptime': defaultdict(lambda: defaultdict(float)),
             'partial_resists': defaultdict(list),
             'resists': defaultdict(list),
+            'missile_count': defaultdict(list),
+            'rupture_missile_count': defaultdict(list),
             'total_spell_dmg': [],
             'total_dot_dmg': [],
             'total_ignite_dmg': [],
@@ -462,6 +478,11 @@ class Simulation:
                 merged['casts'][char].extend(chunk['casts'][char])
                 merged['partial_resists'][char].extend(chunk['partial_resists'][char])
                 merged['resists'][char].extend(chunk['resists'][char])
+
+                # Merge missile counts if they exist
+                if char in chunk['missile_count']:
+                    merged['missile_count'][char].extend(chunk['missile_count'][char])
+                    merged['rupture_missile_count'][char].extend(chunk['rupture_missile_count'][char])
 
                 if char in chunk['per_spell_data']:
                     for spell, data in chunk['per_spell_data'][char].items():
@@ -577,6 +598,20 @@ class Simulation:
             for char in self.results['resists']:
                 label = f"{char} Resists"
                 print(f"{self._justify(label)}: {mean(self.results['resists'][char])}")
+
+            # Print missile statistics if any character has missile_count
+            if self.results['missile_count']:
+                print(f"------ Rupture Missile Statistics ------")
+                for char in self.results['missile_count']:
+                    total_missiles = sum(self.results['missile_count'][char])
+                    total_rupture_missiles = sum(self.results['rupture_missile_count'][char])
+                    avg_missiles = mean(self.results['missile_count'][char])
+                    avg_rupture_missiles = mean(self.results['rupture_missile_count'][char])
+
+                    if total_missiles > 0:
+                        rupture_pct = round(100 * total_rupture_missiles / total_missiles, 1)
+                        label = f"{char} % Missiles with Rupture"
+                        print(f"{self._justify(label)}: {rupture_pct}%")
 
         if verbosity > 2:
             print(f"------ Buff Uptime ------")

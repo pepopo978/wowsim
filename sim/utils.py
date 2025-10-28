@@ -119,6 +119,12 @@ class DamageMeter:
         print(
             f"{'Average DPS'.ljust(JUSTIFY, ' ')}: {round(total_raid_dmg / total_time / len(self.character_dmg.keys()), 1)}")
 
+        # Print rupture missile percentage for characters with missile_count > 0
+        for character in self.env.characters:
+            if hasattr(character, 'missile_count') and character.missile_count > 0:
+                rupture_pct = round(100 * character.rupture_missile_count / character.missile_count, 1)
+                print(f"{character.name.ljust(JUSTIFY, ' ')}: {rupture_pct}% missiles with rupture ({character.rupture_missile_count}/{character.missile_count})")
+
         self.env.debuffs.ignite.report()
         self.env.debuffs.improved_shadow_bolt.report()
 

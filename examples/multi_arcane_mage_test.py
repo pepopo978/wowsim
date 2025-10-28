@@ -2,8 +2,87 @@ from _example_imports import *
 
 mages = []
 
-haste = 10
-m = Mage(name=f'normal', sp=1000, crit=40, hit=16, haste=haste,
+base_sp = 1000
+base_crit = 30
+base_hit = 16
+base_haste = 25
+
+m = Mage(name=f'5yd', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+         tal=ArcaneMageTalents(),
+         opts=MageOptions(
+             extra_second_arcane_missile=True,
+             distance_from_mob=5,
+         ),
+         equipped_items=EquippedItems(
+             ornate_bloodstone_dagger=False,
+             wrath_of_cenarius=True,
+             true_band_of_sulfuras=True,
+             endless_gulch=False,
+         ))
+m.arcane_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
+mages.append(m)
+
+m = Mage(name=f'10yd', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+         tal=ArcaneMageTalents(),
+         opts=MageOptions(
+             extra_second_arcane_missile=True,
+             distance_from_mob=10,
+         ),
+         equipped_items=EquippedItems(
+             ornate_bloodstone_dagger=False,
+             wrath_of_cenarius=True,
+             true_band_of_sulfuras=True,
+             endless_gulch=False,
+         ))
+m.arcane_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
+mages.append(m)
+
+m = Mage(name=f'15yd', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+         tal=ArcaneMageTalents(),
+         opts=MageOptions(
+             extra_second_arcane_missile=True,
+             distance_from_mob=15,
+         ),
+         equipped_items=EquippedItems(
+             ornate_bloodstone_dagger=False,
+             wrath_of_cenarius=True,
+             true_band_of_sulfuras=True,
+             endless_gulch=False,
+         ))
+m.arcane_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
+mages.append(m)
+
+m = Mage(name=f'20yd', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+         tal=ArcaneMageTalents(),
+         opts=MageOptions(
+             extra_second_arcane_missile=True,
+             distance_from_mob=20,
+         ),
+         equipped_items=EquippedItems(
+             ornate_bloodstone_dagger=False,
+             wrath_of_cenarius=True,
+             true_band_of_sulfuras=True,
+             endless_gulch=False,
+         ))
+m.arcane_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
+mages.append(m)
+
+m = Mage(name=f'25yd', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+         tal=ArcaneMageTalents(),
+         opts=MageOptions(
+             extra_second_arcane_missile=True,
+             distance_from_mob=25,
+         ),
+         equipped_items=EquippedItems(
+             ornate_bloodstone_dagger=False,
+             wrath_of_cenarius=True,
+             true_band_of_sulfuras=True,
+             endless_gulch=False,
+         ))
+m.arcane_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
+mages.append(m)
+
+m = Mage(name=f'30yd', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
          tal=ArcaneMageTalents(),
          opts=MageOptions(
              extra_second_arcane_missile=True,
@@ -15,8 +94,24 @@ m = Mage(name=f'normal', sp=1000, crit=40, hit=16, haste=haste,
              true_band_of_sulfuras=True,
              endless_gulch=False,
          ))
-m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
+m.arcane_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
 mages.append(m)
+
+#
+# m = Mage(name=f'high haste', sp=1050, crit=35, hit=16, haste=25,
+#          tal=ArcaneMageTalents(),
+#          opts=MageOptions(
+#              extra_second_arcane_missile=True,
+#              distance_from_mob=distance_from_mob,
+#          ),
+#          equipped_items=EquippedItems(
+#              ornate_bloodstone_dagger=False,
+#              wrath_of_cenarius=True,
+#              true_band_of_sulfuras=True,
+#              endless_gulch=False,
+#          ))
+# m.arcane_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
+# mages.append(m)
 #
 # m = Mage(name=f'interrupt for r', sp=1000, crit=40, hit=16, haste=haste,
 #          tal=ArcaneMageTalents(),
@@ -176,5 +271,5 @@ mages.append(m)
 # mages.append(m)
 
 sim = Simulation(characters=mages, num_mobs=1, mob_level=63)
-sim.run(iterations=5000, duration=120, print_casts=False, use_multiprocessing=True)
+sim.run(iterations=10000, duration=180, print_casts=False, use_multiprocessing=True)
 sim.detailed_report()

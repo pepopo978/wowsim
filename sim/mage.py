@@ -40,6 +40,9 @@ class Mage(Character):
 
         self.hot_streak = None
 
+        self.missile_count = 0
+        self.rupture_missile_count = 0
+
         if self.tal:
             if self.tal.critical_mass:
                 self.damage_type_crit[DamageType.FIRE] += 6
@@ -494,9 +497,12 @@ class Mage(Character):
                 if arcane_instability_hit:
                     dmg *= 1.25
 
-            if self.arcane_rupture_cd.is_active() and spell == Spell.ARCANE_MISSILE:
-                dmg *= 1.20
-                arcane_rupture_applied = True
+            if spell == Spell.ARCANE_MISSILE:
+                self.missile_count += 1
+                if self.arcane_rupture_cd.is_active():
+                    dmg *= 1.20
+                    arcane_rupture_applied = True
+                    self.rupture_missile_count += 1
 
             if self.opts.t35_3_set and spell in {Spell.FLAMESTRIKER6, Spell.CONE_OF_COLD, Spell.FROST_NOVA,
                                                  Spell.BLASTWAVE, Spell.ARCANE_EXPLOSION}:
