@@ -113,9 +113,10 @@ class Druid(Character):
                        spell: Spell,
                        damage_type: DamageType,
                        talent_school: TalentSchool,
-                       min_dmg: int,
-                       max_dmg: int,
-                       crit_modifier: float,
+                       hit: bool,
+                       crit: bool,
+                       dmg: int,
+                       partial_amount: float,
                        casting_time: float,
                        gcd_wait_time: float,
                        had_natures_grace: bool,
@@ -123,24 +124,6 @@ class Druid(Character):
 
         if travel_time:
             yield self.env.timeout(travel_time)
-
-        hit = self._roll_hit(self._get_hit_chance(spell), damage_type)
-        crit = False
-        dmg = 0
-        if hit:
-            crit = self._roll_crit(self.crit + crit_modifier, damage_type)
-            dmg = self.roll_spell_dmg(min_dmg, max_dmg, SPELL_COEFFICIENTS.get(spell, 0), damage_type)
-            dmg = self.modify_dmg(dmg, damage_type, is_periodic=False)
-        else:
-            self.num_resists += 1
-
-        is_binary_spell = spell in {}
-
-        partial_amount = self.roll_partial(is_dot=False, is_binary=is_binary_spell)
-        partial_desc = ""
-        if partial_amount < 1:
-            dmg = int(dmg * partial_amount)
-            partial_desc = f"({int(partial_amount * 100)}% partial)"
 
         description = ""
         if self.env.print:
@@ -150,42 +133,28 @@ class Druid(Character):
                 description = f"({round(casting_time, 2)} cast)"
             if gcd_wait_time:
                 description += f" ({round(gcd_wait_time, 2)} gcd)"
-
+            if partial_amount != 1:
+                description += f" ({int(partial_amount * 100)}% partial)"
             if had_natures_grace:
                 description += " (NG)"
-        if not hit:
-            self.print(f"{spell.value} {description} RESIST")
-        elif not crit:
-            self.print(f"{spell.value} {description} {partial_desc} {dmg}")
-        else:
-            mult = self._get_crit_multiplier(talent_school, damage_type)
-            dmg = int(dmg * mult)
 
-            if self.tal.natures_grace:
-                self.natures_grace_active = True
+            if not hit:
+                self.print(f"{spell.value} {description} RESIST")
+            elif not crit:
+                self.print(f"{spell.value} {description} {dmg}")
+            else:
+                self.print(f"{spell.value} {description} **{dmg}**")
 
-            self.print(f"{spell.value} {description} {partial_desc} **{dmg}**")
-
-        if hit:
-            if spell == Spell.STARFIRE and not self.arcane_eclipse.is_active():
-                # 50% chance to enter arcane eclipse on starfire hit
-                if self._roll_proc(50):
-                    self.nature_eclipse.activate()
-            elif spell == Spell.WRATH and not self.nature_eclipse.is_active():
-                # 30% chance to enter nature eclipse on wrath hit
-                if self._roll_proc(30):
-                    self.arcane_eclipse.activate()
+        if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
+            self._check_for_procs(
+                spell=spell,
+                damage_type=damage_type)
 
         if hit and self.cds.zhc.is_active():
             self.cds.zhc.use_charge()
 
         if hit and spell == Spell.MOONFIRE:
             self.env.debuffs.add_dot(MoonfireDot, self, 0)
-
-        if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
-            self._check_for_procs(
-                spell=spell,
-                damage_type=damage_type)
 
         self.env.meter.register_spell_dmg(
             char_name=self.name,
@@ -229,19 +198,48 @@ class Druid(Character):
         if casting_time:
             yield self.env.timeout(casting_time)
 
+        hit = self._roll_hit(self._get_hit_chance(spell), damage_type)
+        crit = False
+        dmg = 0
+
+        if hit:
+            crit = self._roll_crit(self.crit + crit_modifier, damage_type)
+            dmg = self.roll_spell_dmg(min_dmg, max_dmg, SPELL_COEFFICIENTS.get(spell, 0), damage_type)
+            dmg = self.modify_dmg(dmg, damage_type, is_periodic=False)
+        else:
+            self.num_resists += 1
+
+        is_binary_spell = spell in {}
+
+        partial_amount = self.roll_partial(is_dot=False, is_binary=is_binary_spell)
+        if partial_amount < 1:
+            dmg = int(dmg * partial_amount)
+
+        # trigger spell resolve when it hits the target
+        travel_time = 0
+        if spell in SPELL_PROJECTILE_SPEED:
+            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+
+        if crit:
+            mult = self._get_crit_multiplier(talent_school, damage_type)
+            dmg = int(dmg * mult)
+
+            if self.tal.natures_grace:
+                self.natures_grace_active = True
+
         if spell in SPELL_PROJECTILE_SPEED:
             self.print(f"{spell.value} ({round(casting_time, 2)} cast)")
-            # trigger spell resolve when it hits the target
-            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+
             self.env.process(
                 self._spell_resolve(
                     travel_time=travel_time,
                     spell=spell,
                     damage_type=damage_type,
                     talent_school=talent_school,
-                    min_dmg=min_dmg,
-                    max_dmg=max_dmg,
-                    crit_modifier=crit_modifier,
+                    hit=hit,
+                    crit=crit,
+                    dmg=dmg,
+                    partial_amount=partial_amount,
                     casting_time=casting_time,
                     gcd_wait_time=gcd_wait_time,
                     had_natures_grace=had_natures_grace,
@@ -250,13 +248,14 @@ class Druid(Character):
         else:
             # spell hits target immediately
             yield from self._spell_resolve(
-                travel_time=0,
+                travel_time=travel_time,
                 spell=spell,
                 damage_type=damage_type,
                 talent_school=talent_school,
-                min_dmg=min_dmg,
-                max_dmg=max_dmg,
-                crit_modifier=crit_modifier,
+                hit=hit,
+                crit=crit,
+                dmg=dmg,
+                partial_amount=partial_amount,
                 casting_time=casting_time,
                 gcd_wait_time=gcd_wait_time,
                 had_natures_grace=had_natures_grace,
@@ -267,8 +266,11 @@ class Druid(Character):
             yield self.env.timeout(gcd_wait_time)
 
     def _arcane_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
-        # Arcane spells don't have special on-resolve effects currently
-        pass
+        if hit:
+            if spell == Spell.STARFIRE and not self.arcane_eclipse.is_active():
+                # 50% chance to enter arcane eclipse on starfire hit
+                if self._roll_proc(50):
+                    self.nature_eclipse.activate()
 
     def _arcane_spell(self,
                       spell: Spell,
@@ -320,8 +322,11 @@ class Druid(Character):
                                       crit_modifier=crit_modifier)
 
     def _nature_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
-        # Nature spells don't have special on-resolve effects currently
-        pass
+        if hit:
+            if spell == Spell.WRATH and not self.nature_eclipse.is_active():
+                # 30% chance to enter nature eclipse on wrath hit
+                if self._roll_proc(30):
+                    self.arcane_eclipse.activate()
 
     def _nature_spell(self,
                       spell: Spell,

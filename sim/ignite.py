@@ -136,7 +136,10 @@ class Ignite:
             tick_dmg *= 1.1  # ignite double dips on CoE
 
         if self.env.debuffs.has_nightfall:
-            tick_dmg *= 1.15
+            tick_dmg *= 1.10
+
+        if self.env.debuffs.freezing_cold_timer > 0:
+            tick_dmg *= 1.05
 
         # doesn't snapshot on vmangos
         tick_dmg *= self.owner.dmg_modifier  # includes AP/PI

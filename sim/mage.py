@@ -337,6 +337,10 @@ class Mage(Character):
             if not self.has_trinket_or_cooldown_haste():
                 if self.fire_blast_cd.usable:
                     yield from self._fire_blast()
+                    if self.opts.scorch_after_fire_blast:
+                        has_min_ignite_stack = self.env.debuffs.ignite and self.env.debuffs.ignite.stacks >= self.opts.min_ignite_stacks_to_extend
+                        if has_min_ignite_stack:
+                            yield from self._scorch()
                     continue
                 elif self.env.debuffs.fire_vuln_stacks < 5 or self.env.debuffs.fire_vuln_timer <= 4.5:
                     yield from self._scorch()
@@ -432,11 +436,11 @@ class Mage(Character):
         return int(dmg)
 
     def check_for_ignite_extend(self, spell: Spell):
-        has_ignite_stack = self.env.debuffs.ignite and self.env.debuffs.ignite.stacks == 5
+        has_min_ignite_stack = self.env.debuffs.ignite and self.env.debuffs.ignite.stacks >= self.opts.min_ignite_stacks_to_extend
 
         has_ignite_extend_option = self.opts.extend_ignite_with_fire_blast or self.opts.extend_ignite_with_scorch
 
-        return (has_ignite_stack and
+        return (has_min_ignite_stack and
                 has_ignite_extend_option and
                 spell not in (
                     Spell.FIREBLAST,
@@ -462,69 +466,17 @@ class Mage(Character):
                        travel_time: float,
                        spell: Spell,
                        damage_type: DamageType,
-                       talent_school: TalentSchool,
-                       min_dmg: int,
-                       max_dmg: int,
-                       crit_modifier: float,
+                       hit: bool,
+                       crit: bool,
+                       dmg: int,
+                       partial_amount: float,
                        casting_time: float,
                        gcd_wait_time: float,
+                       data: dict,
                        resolved_callback):
 
         if travel_time:
             yield self.env.timeout(travel_time)
-
-        hit = self._roll_hit(self._get_hit_chance(spell),
-                             damage_type) if spell != Spell.ARCANE_SURGE else True  # arcane surge always hits
-        crit = False
-        dmg = 0
-        arcane_instability_hit = False
-        arcane_rupture_applied = False
-        if hit:
-            crit = self._roll_crit(self.crit + crit_modifier, damage_type)
-            dmg = self.roll_spell_dmg(min_dmg, max_dmg, SPELL_COEFFICIENTS.get(spell, 0), damage_type)
-            dmg = self.modify_dmg(dmg, damage_type, is_periodic=False)
-
-            if (self._t3_arcane_8set_proc_time and
-                    (spell != Spell.ARCANE_MISSILE and spell != Spell.ICICLE)):
-                if self._t3_arcane_8set_proc_time + 6 > self.env.now:
-                    dmg *= 1.1
-                self._t3_arcane_8set_proc_time = False
-
-            if self.tal.arcane_instability and damage_type == DamageType.ARCANE:
-                hit_chance = {1: 8, 2: 16, 3: 25}.get(self.tal.arcane_instability, 0)
-
-                arcane_instability_hit = self._roll_proc(hit_chance)
-                if arcane_instability_hit:
-                    dmg *= 1.25
-
-            if spell == Spell.ARCANE_MISSILE:
-                self.missile_count += 1
-                if self.arcane_rupture_cd.is_active():
-                    dmg *= 1.20
-                    arcane_rupture_applied = True
-                    self.rupture_missile_count += 1
-
-            if self.opts.t35_3_set and spell in {Spell.FLAMESTRIKER6, Spell.CONE_OF_COLD, Spell.FROST_NOVA,
-                                                 Spell.BLASTWAVE, Spell.ARCANE_EXPLOSION}:
-                if self._roll_proc(10):
-                    dmg *= 1.15
-                    self.print(f"{spell.value} T3 3-set proc")
-        else:
-            self.arcane_surge_cd.enable_due_to_resist()
-            self.num_resists += 1
-
-        is_binary_spell = spell in {Spell.FROSTBOLT, Spell.FROSTBOLTRK4, Spell.FROSTBOLTRK3, Spell.FROST_NOVA,
-                                    Spell.CONE_OF_COLD, Spell.ARCANE_SURGE}
-
-        partial_amount = self.roll_partial(is_dot=False, is_binary=is_binary_spell)
-        partial_desc = ""
-        if partial_amount < 1:
-            dmg = int(dmg * partial_amount)
-            partial_desc = f"({int(partial_amount * 100)}% partial)"
-            self.arcane_surge_cd.enable_due_to_resist()
-
-            if self.opts.t3_8_set:
-                self._t3_arcane_8set_proc_time = self.env.now
 
         description = ""
         if self.env.print:
@@ -534,18 +486,19 @@ class Mage(Character):
                 description = f"({round(casting_time, 2)} cast)"
             if gcd_wait_time:
                 description += f" ({round(gcd_wait_time, 2)} gcd)"
-            if arcane_instability_hit:
+            if data.get("arcane_instability_hit", False):
                 description += " (AI)"
-            if arcane_rupture_applied:
+            if data.get("arcane_rupture_applied", False):
                 description += " (AR)"
-        if not hit:
-            self.print(f"{spell.value} {description} RESIST")
-        elif not crit:
-            self.print(f"{spell.value} {description} {partial_desc} {dmg}")
-        else:
-            mult = self._get_crit_multiplier(talent_school, damage_type)
-            dmg = int(dmg * mult)
-            self.print(f"{spell.value} {description} {partial_desc} **{dmg}**")
+            if partial_amount != 1:
+                description += f" ({int(partial_amount * 100)}% partial)"
+
+            if not hit:
+                self.print(f"{spell.value} {description} RESIST")
+            elif not crit:
+                self.print(f"{spell.value} {description} {dmg}")
+            else:
+                self.print(f"{spell.value} {description} **{dmg}**")
 
         if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
             self._check_for_procs(
@@ -577,6 +530,16 @@ class Mage(Character):
             resolved_callback(spell, hit, crit, dmg, partial_amount)
         else:
             raise Exception("missing spell resolved callback")
+
+    def _activate_cooldowns(self, spell: Spell, hit):
+        if spell == Spell.ARCANE_SURGE:
+            self.arcane_surge_cd.activate()
+        elif spell == Spell.ARCANE_RUPTURE:
+            self.arcane_rupture_cd.activate(hit)
+        elif spell == Spell.FROST_NOVA:
+            self.frost_nova_cd.activate()
+        elif spell == Spell.CONE_OF_COLD:
+            self.cone_of_cold_cd.activate()
 
     # caller must handle any gcd cooldown
     # handle spell cast
@@ -610,35 +573,102 @@ class Mage(Character):
         if casting_time:
             yield self.env.timeout(casting_time)
 
+        hit = self._roll_hit(self._get_hit_chance(spell),
+                             damage_type) if spell != Spell.ARCANE_SURGE else True  # arcane surge always hits
+        crit = False
+        dmg = 0
+
+        self._activate_cooldowns(spell, hit)
+
+        data = {
+            "arcane_instability_hit": False,
+            "arcane_rupture_applied": False
+        }
+        if hit:
+            crit = self._roll_crit(self.crit + crit_modifier, damage_type)
+            dmg = self.roll_spell_dmg(min_dmg, max_dmg, SPELL_COEFFICIENTS.get(spell, 0), damage_type)
+            dmg = self.modify_dmg(dmg, damage_type, is_periodic=False)
+
+            if (self._t3_arcane_8set_proc_time and
+                    (spell != Spell.ARCANE_MISSILE and spell != Spell.ICICLE)):
+                if self._t3_arcane_8set_proc_time + 6 > self.env.now:
+                    dmg *= 1.1
+                self._t3_arcane_8set_proc_time = False
+
+            if self.tal.arcane_instability and damage_type == DamageType.ARCANE:
+                hit_chance = {1: 8, 2: 16, 3: 25}.get(self.tal.arcane_instability, 0)
+
+                arcane_instability_hit = self._roll_proc(hit_chance)
+                if arcane_instability_hit:
+                    data["arcane_instability_hit"] = True
+                    dmg *= 1.25
+
+            if spell == Spell.ARCANE_MISSILE:
+                self.missile_count += 1
+                if self.arcane_rupture_cd.is_active():
+                    dmg *= 1.20
+                    data["arcane_rupture_applied"] = True
+                    self.rupture_missile_count += 1
+
+            if self.opts.t35_3_set and spell in {Spell.FLAMESTRIKER6, Spell.CONE_OF_COLD, Spell.FROST_NOVA,
+                                                 Spell.BLASTWAVE, Spell.ARCANE_EXPLOSION}:
+                if self._roll_proc(10):
+                    dmg *= 1.15
+                    self.print(f"{spell.value} T3 3-set proc")
+        else:
+            self.arcane_surge_cd.enable_due_to_resist()
+            self.num_resists += 1
+
+        is_binary_spell = spell in {Spell.FROSTBOLT, Spell.FROSTBOLTRK4, Spell.FROSTBOLTRK3, Spell.FROST_NOVA,
+                                    Spell.CONE_OF_COLD, Spell.ARCANE_SURGE}
+
+        partial_amount = self.roll_partial(is_dot=False, is_binary=is_binary_spell)
+        if partial_amount < 1:
+            dmg = int(dmg * partial_amount)
+            self.arcane_surge_cd.enable_due_to_resist()
+
+            if self.opts.t3_8_set:
+                self._t3_arcane_8set_proc_time = self.env.now
+
+        # trigger spell resolve when it hits the target
+        travel_time = 0
+        if spell in SPELL_PROJECTILE_SPEED:
+            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+
+        if crit:
+            mult = self._get_crit_multiplier(talent_school, damage_type)
+            dmg = int(dmg * mult)
+
         if spell in SPELL_PROJECTILE_SPEED:
             self.print(f"{spell.value} ({round(casting_time, 2)} cast)")
-            # trigger spell resolve when it hits the target
-            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+
             self.env.process(
                 self._spell_resolve(
                     travel_time=travel_time,
                     spell=spell,
                     damage_type=damage_type,
-                    talent_school=talent_school,
-                    min_dmg=min_dmg,
-                    max_dmg=max_dmg,
-                    crit_modifier=crit_modifier,
+                    hit=hit,
+                    crit=crit,
+                    dmg=dmg,
+                    partial_amount=partial_amount,
                     casting_time=casting_time,
                     gcd_wait_time=gcd_wait_time,
+                    data=data,
                     resolved_callback=resolved_callback)
             )
         else:
             # spell hits target immediately
             yield from self._spell_resolve(
-                travel_time=0,
+                travel_time=travel_time,
                 spell=spell,
                 damage_type=damage_type,
-                talent_school=talent_school,
-                min_dmg=min_dmg,
-                max_dmg=max_dmg,
-                crit_modifier=crit_modifier,
+                hit=hit,
+                crit=crit,
+                dmg=dmg,
+                partial_amount=partial_amount,
                 casting_time=casting_time,
                 gcd_wait_time=gcd_wait_time,
+                data=data,
                 resolved_callback=resolved_callback)
 
         # wait for gcd
@@ -676,11 +706,6 @@ class Mage(Character):
                     self.temporal_convergence_cd.activate()
                     # reset cd on rupture
                     self.arcane_rupture_cd.reset_cooldown()
-
-        if spell == Spell.ARCANE_SURGE:
-            self.arcane_surge_cd.activate()
-        elif spell == Spell.ARCANE_RUPTURE:
-            self.arcane_rupture_cd.activate()
 
     def _arcane_spell(self,
                       spell: Spell,
@@ -750,11 +775,6 @@ class Mage(Character):
                     and not self.arcane_rupture_cd.is_active():
                 # if rupture not active, use surge immediately
                 if not self.arcane_rupture_cd.is_active():
-                    yield self.env.timeout(self.opts.delay_when_interrupting_missiles)
-                    yield from self._arcane_surge()
-                    return
-                # otherwise wait until it is about to expire
-                if self.arcane_surge_cd.time_left() < time_between_missiles:
                     yield self.env.timeout(self.opts.delay_when_interrupting_missiles)
                     yield from self._arcane_surge()
                     return
@@ -855,9 +875,6 @@ class Mage(Character):
                     self.hot_streak.add_stack()
 
             self.cds.combustion.use_charge()  # only used on crit
-
-        if spell == Spell.FIREBLAST:
-            self.fire_blast_cd.activate()
 
 
     def _fire_spell(self,
@@ -1041,10 +1058,6 @@ class Mage(Character):
                 self._flash_freeze_proc = True
                 self.print("Flash Freeze proc")
 
-        if spell == Spell.FROST_NOVA:
-            self.frost_nova_cd.activate()
-        elif spell == Spell.CONE_OF_COLD:
-            self.cone_of_cold_cd.activate()
 
     def _frost_spell(self,
                      spell: Spell,

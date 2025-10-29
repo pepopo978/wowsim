@@ -2,11 +2,15 @@ from _example_imports import *
 
 mages = []
 
-base_sp = 1000
-base_crit = 40
-base_hit = 16
-base_haste = 4
+# base_sp = 1000
+# base_crit = 40
+# base_hit = 14
+# base_haste = 4
 
+base_sp = 300
+base_crit = 18
+base_hit = 13
+base_haste = 2
 
 def set_rotation(mage: Mage, cds: CooldownUsages):
     mage.arcane_surge_rupture_missiles(cds=cds)

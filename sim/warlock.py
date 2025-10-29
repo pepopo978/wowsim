@@ -138,36 +138,16 @@ class Warlock(Character):
                        spell: Spell,
                        damage_type: DamageType,
                        talent_school: TalentSchool,
-                       min_dmg: int,
-                       max_dmg: int,
-                       crit_modifier: float,
+                       hit: bool,
+                       crit: bool,
+                       dmg: int,
+                       partial_amount: float,
                        casting_time: float,
                        gcd_wait_time: float,
                        resolved_callback):
 
         if travel_time:
             yield self.env.timeout(travel_time)
-
-        hit = self._roll_hit(self._get_hit_chance(spell), damage_type)
-        crit = False
-        dmg = 0
-
-        if hit:
-            if spell != Spell.CORRUPTION:
-                crit = self._roll_crit(self.crit + crit_modifier, damage_type)
-
-            dmg = self.roll_spell_dmg(min_dmg, max_dmg, SPELL_COEFFICIENTS.get(spell, 0), damage_type)
-            dmg = self.modify_dmg(dmg, damage_type, is_periodic=False)
-        else:
-            self.num_resists += 1
-
-        is_binary_spell = False
-
-        partial_amount = self.roll_partial(is_dot=False, is_binary=is_binary_spell)
-        partial_desc = ""
-        if partial_amount < 1:
-            dmg = int(dmg * partial_amount)
-            partial_desc = f"({int(partial_amount * 100)}% partial)"
 
         description = ""
         if self.env.print:
@@ -177,27 +157,18 @@ class Warlock(Character):
                 description = f"({round(casting_time, 2)} cast)"
             if gcd_wait_time:
                 description += f" ({round(gcd_wait_time, 2)} gcd)"
+            if partial_amount != 1:
+                description += f" ({int(partial_amount * 100)}% partial)"
 
             if damage_type == DamageType.SHADOW and self.env.debuffs.improved_shadow_bolt.is_active:
                 description += " (ISB)"
 
-        if not hit:
-            self.print(f"{spell.value} {description} RESIST")
-        elif not crit:
-            self.print(f"{spell.value} {description} {partial_desc} {dmg}")
-
-            if self.tal.improved_shadow_bolt and spell == Spell.SHADOWBOLT:
-                if self._roll_proc(self.tal.improved_shadow_bolt * 2):
-                    self.env.debuffs.improved_shadow_bolt.refresh(self)
-
-        else:
-            mult = self._get_crit_multiplier(damage_type, talent_school)
-            dmg = int(dmg * mult)
-            self.print(f"{spell.value} {description} {partial_desc} **{dmg}**")
-
-            if self.tal.improved_shadow_bolt and spell == Spell.SHADOWBOLT:
-                if self._roll_proc(self.tal.improved_shadow_bolt * 20):
-                    self.env.debuffs.improved_shadow_bolt.refresh(self)
+            if not hit:
+                self.print(f"{spell.value} {description} RESIST")
+            elif not crit:
+                self.print(f"{spell.value} {description} {dmg}")
+            else:
+                self.print(f"{spell.value} {description} **{dmg}**")
 
         if hit and SPELL_TRIGGERS_ON_HIT.get(spell, False):
             self._check_for_procs(
@@ -262,19 +233,47 @@ class Warlock(Character):
         if casting_time:
             yield self.env.timeout(casting_time)
 
+        hit = self._roll_hit(self._get_hit_chance(spell), damage_type)
+        crit = False
+        dmg = 0
+
+        if hit:
+            if spell != Spell.CORRUPTION:
+                crit = self._roll_crit(self.crit + crit_modifier, damage_type)
+
+            dmg = self.roll_spell_dmg(min_dmg, max_dmg, SPELL_COEFFICIENTS.get(spell, 0), damage_type)
+            dmg = self.modify_dmg(dmg, damage_type, is_periodic=False)
+        else:
+            self.num_resists += 1
+
+        is_binary_spell = False
+
+        partial_amount = self.roll_partial(is_dot=False, is_binary=is_binary_spell)
+        if partial_amount < 1:
+            dmg = int(dmg * partial_amount)
+
+        # trigger spell resolve when it hits the target
+        travel_time = 0
+        if spell in SPELL_PROJECTILE_SPEED:
+            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+
+        if crit:
+            mult = self._get_crit_multiplier(damage_type, talent_school)
+            dmg = int(dmg * mult)
+
         if spell in SPELL_PROJECTILE_SPEED:
             self.print(f"{spell.value} ({round(casting_time, 2)} cast)")
-            # trigger spell resolve when it hits the target
-            travel_time = self.opts.distance_from_mob / SPELL_PROJECTILE_SPEED[spell]
+
             self.env.process(
                 self._spell_resolve(
                     travel_time=travel_time,
                     spell=spell,
                     damage_type=damage_type,
                     talent_school=talent_school,
-                    min_dmg=min_dmg,
-                    max_dmg=max_dmg,
-                    crit_modifier=crit_modifier,
+                    hit=hit,
+                    crit=crit,
+                    dmg=dmg,
+                    partial_amount=partial_amount,
                     casting_time=casting_time,
                     gcd_wait_time=gcd_wait_time,
                     resolved_callback=resolved_callback)
@@ -282,13 +281,14 @@ class Warlock(Character):
         else:
             # spell hits target immediately
             yield from self._spell_resolve(
-                travel_time=0,
+                travel_time=travel_time,
                 spell=spell,
                 damage_type=damage_type,
                 talent_school=talent_school,
-                min_dmg=min_dmg,
-                max_dmg=max_dmg,
-                crit_modifier=crit_modifier,
+                hit=hit,
+                crit=crit,
+                dmg=dmg,
+                partial_amount=partial_amount,
                 casting_time=casting_time,
                 gcd_wait_time=gcd_wait_time,
                 resolved_callback=resolved_callback)
@@ -324,8 +324,13 @@ class Warlock(Character):
                                resolved_callback=self._fire_spell_resolved)
 
     def _shadow_spell_resolved(self, spell, hit, crit, dmg, partial_amount):
-        # Shadow spells don't have special on-resolve effects currently
-        pass
+        if self.tal.improved_shadow_bolt and spell == Spell.SHADOWBOLT:
+            if crit:
+                if self._roll_proc(self.tal.improved_shadow_bolt * 20):
+                    self.env.debuffs.improved_shadow_bolt.refresh(self)
+            elif hit:
+                if self._roll_proc(self.tal.improved_shadow_bolt * 2):
+                    self.env.debuffs.improved_shadow_bolt.refresh(self)
 
     def _shadow_spell(self,
                       spell: Spell,

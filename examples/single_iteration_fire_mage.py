@@ -7,11 +7,13 @@ base_haste = 4
 
 duration=120
 
-fm = Mage(name=f'mqg', sp=base_sp, crit=base_crit, hit=base_hit, haste=base_haste,
+fm = Mage(name=f'fireblast -> scorch', sp=1050, crit=50, hit=16, haste=5,
           tal=FireMageTalents(),
-          opts=MageOptions(),
-          equipped_items=EquippedItems())
-fm.spam_arcane_explosion(cds=CooldownUsages(mqg=12))
+          opts=MageOptions(
+              min_ignite_stacks_to_extend=2,
+              scorch_after_fire_blast=True,
+          ))
+fm.smart_scorch_and_fireblast(CooldownUsages(combustion=10, mqg=10))
 
 # sim = Simulation(characters=[fm])
 # sim.run(iterations=20000, duration=duration, print_casts=False)

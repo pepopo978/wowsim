@@ -160,7 +160,7 @@ class ArcaneSurgeCooldown(Cooldown):
 
 
 class ArcaneRuptureCooldown(Cooldown):
-    PRINTS_ACTIVATION = False
+    PRINTS_ACTIVATION = True
     TRACK_UPTIME = True
 
     def __init__(self, character: Character, apply_cd_haste: bool):
@@ -169,13 +169,16 @@ class ArcaneRuptureCooldown(Cooldown):
         self._apply_cd_haste = apply_cd_haste
         self._cast_number = 0
 
+        self.activation_id = 0
+        self.cooldown_id = 0
+
     @property
     def usable(self):
         return not self._on_cooldown
 
     @property
     def duration(self):
-        return 7.6 # account for .4s missile travel time
+        return 8
 
     @property
     def cooldown(self):
@@ -183,44 +186,46 @@ class ArcaneRuptureCooldown(Cooldown):
             DamageType.ARCANE) if self._apply_cd_haste else self._base_cd
 
     # need special handling for when cooldown ends due to possibility of cooldown reset
-    def activate(self):
+    # also tied to resists
+    def activate(self, hit: bool = False):
         if self.usable:
-            self._active = True
+            self.activation_id += 1
+            self._active = hit
 
-            self.track_buff_start_time()
+            if hit:
+                self.track_buff_start_time()
 
             if self.PRINTS_ACTIVATION:
                 self.character.print(f"{self.name} activated")
 
-            cooldown = self.cooldown
-            if self.STARTS_CD_ON_ACTIVATION and cooldown:
-                self._on_cooldown = True
+            self._on_cooldown = True
 
-                def callback(self, cooldown, cast_number):
-                    yield self.env.timeout(cooldown)
-                    # if cooldown got reset already, do nothing
-                    if cast_number == self._cast_number:
-                        if self.PRINTS_ACTIVATION:
-                            self.character.print(f"{self.name} cooldown ended after {cooldown} seconds")
+            # cooldown ended timer
+            def callback(self, cooldown, cooldown_id):
+                yield self.env.timeout(cooldown)
+                # if cooldown got reset already, do nothing
+                if cooldown_id == self.cooldown_id:
+                    if self.PRINTS_ACTIVATION:
+                        self.character.print(f"{self.name} cooldown ended after {cooldown} seconds")
 
-                        self._on_cooldown = False
-                        self._cast_number += 1
+                    self._on_cooldown = False
 
-                self.character.env.process(callback(self, cooldown, self._cast_number))
 
-            if self.duration:
-                def callback(self):
-                    yield self.character.env.timeout(self.duration)
+            self.character.env.process(callback(self, self.cooldown, self.cooldown_id))
+
+            # deactivate timer
+            def callback(self, activation_id):
+                yield self.character.env.timeout(self.duration)
+                # only deactivate if we didn't cast again since
+                if activation_id == self.activation_id:
                     self.deactivate()
 
-                self.character.env.process(callback(self))
-            else:
-                self.deactivate()
+            self.character.env.process(callback(self, self.activation_id))
 
     def reset_cooldown(self):
         if self.PRINTS_ACTIVATION:
             self.character.print(f"{self.name} cooldown reset")
-        self._cast_number += 1
+        self.cooldown_id += 1
         self._on_cooldown = False
 
 

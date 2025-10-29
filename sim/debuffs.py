@@ -101,7 +101,7 @@ class Debuffs:
                 dmg *= 1.05
 
         if debuffs.has_nightfall:
-            dmg *= 1.15
+            dmg *= 1.10
 
         if damage_type == DamageType.SHADOW:
             if self.shadow_weaving_stacks > 0:
