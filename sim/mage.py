@@ -71,7 +71,7 @@ class Mage(Character):
         self.cold_snap_cd = ColdSnapCooldown(self)
         self.cone_of_cold_cd = ConeOfColdCooldown(self)
         self.icicles_cd = IciclesCooldown(self)
-        self.arcane_rupture_cd = ArcaneRuptureCooldown(self, self.tal.accelerated_arcana)
+        self.arcane_rupture_cd = ArcaneRuptureBuff(self, self.tal.accelerated_arcana)
         self.arcane_surge_cd = ArcaneSurgeCooldown(self, self.tal.accelerated_arcana)
         self.temporal_convergence_cd = TemporalConvergenceCooldown(self)
 
@@ -96,7 +96,7 @@ class Mage(Character):
         while True:
             self._use_cds(cds)
 
-            if self.arcane_rupture_cd.usable:
+            if self.arcane_rupture_cd.usable and not self.arcane_surge_cd.is_active():
                 # if pom available, use it on rupture
                 if self.opts.use_presence_of_mind_on_cd and self.cds.presence_of_mind.usable:
                     self.cds.presence_of_mind.activate()
@@ -534,6 +534,8 @@ class Mage(Character):
     def _activate_cooldowns(self, spell: Spell, hit):
         if spell == Spell.ARCANE_SURGE:
             self.arcane_surge_cd.activate()
+        elif spell == Spell.FIREBLAST:
+            self.fire_blast_cd.activate()
         elif spell == Spell.ARCANE_RUPTURE:
             self.arcane_rupture_cd.activate(hit)
         elif spell == Spell.FROST_NOVA:

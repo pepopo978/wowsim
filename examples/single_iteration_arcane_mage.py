@@ -9,7 +9,7 @@ base_hit = 16
 
 cooldowns = CooldownUsages()
 
-m = Mage(name=f'test', sp=base_sp, crit=base_crit, hit=base_hit, haste=11,
+m = Mage(name=f'test', sp=base_sp, crit=base_crit, hit=base_hit, haste=9,
          tal=ArcaneMageTalents(),
          opts=MageOptions(
              extra_second_arcane_missile=True,

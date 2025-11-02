@@ -159,7 +159,7 @@ class ArcaneSurgeCooldown(Cooldown):
         self._resist_time = None
 
 
-class ArcaneRuptureCooldown(Cooldown):
+class ArcaneRuptureBuff(Cooldown):
     PRINTS_ACTIVATION = True
     TRACK_UPTIME = True
 
