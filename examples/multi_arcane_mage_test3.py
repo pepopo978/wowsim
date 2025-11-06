@@ -5,12 +5,9 @@ mages = []
 base_sp = 1000
 base_crit = 30
 base_hit = 16
+haste = 15
 
-haste=14
-
-cooldowns = CooldownUsages()
-
-m = Mage(name=f'rupture missiles', sp=base_sp, crit=base_crit, hit=base_hit, haste=haste,
+m = Mage(name=f'combined cd', sp=base_sp, crit=base_crit, hit=base_hit, haste=haste,
          tal=ArcaneMageTalents(),
          opts=MageOptions(
              extra_second_arcane_missile=True,
@@ -21,7 +18,21 @@ m = Mage(name=f'rupture missiles', sp=base_sp, crit=base_crit, hit=base_hit, has
              true_band_of_sulfuras=True,
              endless_gulch=False,
          ))
-m.arcane_surge_fireblast_rupture_missiles(cds=cooldowns)
+m.arcane_rupture_missiles(cds=CooldownUsages(mqg=5, arcane_power=5))
+mages.append(m)
+
+m = Mage(name=f'separate cd', sp=base_sp, crit=base_crit, hit=base_hit, haste=haste,
+         tal=ArcaneMageTalents(),
+         opts=MageOptions(
+             extra_second_arcane_missile=True,
+         ),
+         equipped_items=EquippedItems(
+             ornate_bloodstone_dagger=False,
+             wrath_of_cenarius=True,
+             true_band_of_sulfuras=True,
+             endless_gulch=False,
+         ))
+m.arcane_rupture_missiles(cds=CooldownUsages(mqg=5, arcane_power=25))
 mages.append(m)
 
 sim = Simulation(characters=mages, num_mobs=1, mob_level=63)

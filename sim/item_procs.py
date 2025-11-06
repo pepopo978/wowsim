@@ -105,3 +105,8 @@ class SigilOfAncientAccord(ItemProc):
     PERCENT_CHANCE = 8
     COOLDOWN = 2
     PRINT_PROC = True
+
+class SpellwovenNobilityDrape(ItemProc):
+    PERCENT_CHANCE = 10
+    PROC_CHANCE_AFFECTED_BY_ENEMIES_HIT = True
+    PRINT_PROC = True

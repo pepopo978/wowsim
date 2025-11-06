@@ -1,5 +1,5 @@
 from sim.character import Character
-from sim.cooldowns import WrathOfCenariusBuff, EndlessGulchBuff, TrueBandOfSulfurasBuff, BindingsOfContainedMagicBuff
+from sim.cooldowns import WrathOfCenariusBuff, EndlessGulchBuff, TrueBandOfSulfurasBuff, BindingsOfContainedMagicBuff, SpellwovenNobilityDrapeBuff
 from sim.env import Environment
 from sim.equipped_items import EquippedItems
 from sim.item_procs import *
@@ -18,6 +18,7 @@ class ItemProcHandler:
         self.endless_gulch_buff = None
         self.true_band_of_sulfuras_buff = None
         self.bindings_buff = None
+        self.spellwoven_nobility_drape_buff = None
 
         self.wisdom_of_the_makaru_stacks = 0
 
@@ -41,7 +42,10 @@ class ItemProcHandler:
                 self.bindings_buff = BindingsOfContainedMagicBuff(character)
                 self.procs.append(BindingsOfContainedMagic(character, self._bindings_proc))
             if equipped_items.sigil_of_ancient_accord:
-                self.procs.append(SigilOfAncientAccord(character, self._sigil_of_ancient_accord_proc))                   
+                self.procs.append(SigilOfAncientAccord(character, self._sigil_of_ancient_accord_proc))
+            if equipped_items.spellwoven_nobility_drape:
+                self.spellwoven_nobility_drape_buff = SpellwovenNobilityDrapeBuff(character)
+                self.procs.append(SpellwovenNobilityDrape(character, self._spellwoven_nobility_drape))
 
 
     def check_for_procs(self, current_time, spell: Spell, damage_type: DamageType):
@@ -128,3 +132,7 @@ class ItemProcHandler:
                 spell_name=Spell.ANCIENT_ACCORD_SPLASH.value,
                 dmg=dmg,
                 aoe=False)
+
+    def _spellwoven_nobility_drape(self):
+        if self.spellwoven_nobility_drape_buff:
+            self.spellwoven_nobility_drape_buff.activate()
