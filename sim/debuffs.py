@@ -5,8 +5,9 @@ from sim.character import Character
 from sim.fire_dots import PyroblastDot, FireballDot, ImmolateDot
 from sim.ignite import Ignite
 from sim.improved_shadow_bolt import ImprovedShadowBolt
+from sim.item_procs import EmbraceOfTheWindSerpent
 from sim.nature_dots import InsectSwarmDot
-from sim.shadow_dots import CorruptionDot, CurseOfAgonyDot, SiphonLifeDot
+from sim.shadow_dots import CorruptionDot, CurseOfAgonyDot, SiphonLifeDot, FeastOfHakkarDot
 from sim.spell_school import DamageType
 
 
@@ -47,8 +48,11 @@ class Debuffs:
         self.debuff_start_times = {}  # debuff_name -> start_time
         self.debuff_uptimes = {}  # debuff_name -> total_uptime
 
-        # Dynamic dot storage - dot_class -> {owner -> Dot instance}
+        # Dynamic dot storage - dot_class -> {(owner, target_index) -> Dot instance}
         self.dots = {}
+
+        # Decaying Flesh tracking - (owner, target_index) -> stack_count
+        self.decaying_flesh_stacks = {}
 
     def track_debuff_start(self, debuff_name):
         """Track when a debuff starts"""
@@ -137,50 +141,116 @@ class Debuffs:
         self.wc_stacks = min(self.wc_stacks + 1, 5)
         self.wc_timer = 15
 
-    def is_dot_active(self, dot_class, owner):
-        """Generic method to check if a dot is active for a given owner"""
+    def is_dot_active(self, dot_class, owner, target_index=0):
+        """Generic method to check if a dot is active for a given owner and target"""
         if dot_class not in self.dots:
             return False
-        return owner in self.dots[dot_class] and self.dots[dot_class][owner].is_active()
+        key = (owner, target_index)
+        return key in self.dots[dot_class] and self.dots[dot_class][key].is_active()
 
-    def add_dot(self, dot_class, owner, cast_time=0):
+    def add_dot(self, dot_class, owner, cast_time=0, target_index=0):
         """Generic method to add a dot of any class"""
         if dot_class not in self.dots:
             self.dots[dot_class] = {}
-        
-        if owner in self.dots[dot_class] and self.dots[dot_class][owner].is_active():
+
+        key = (owner, target_index)
+        if key in self.dots[dot_class] and self.dots[dot_class][key].is_active():
             # refresh existing dot
-            self.dots[dot_class][owner].refresh(cast_time)
+            self.dots[dot_class][key].refresh(cast_time)
         else:
             # create new dot
-            self.dots[dot_class][owner] = dot_class(owner, self.env, cast_time)
+            self.dots[dot_class][key] = dot_class(owner, self.env, cast_time)
             # start dot thread
-            self.env.process(self.dots[dot_class][owner].run())
+            self.env.process(self.dots[dot_class][key].run())
 
-    def get_dot_time_left(self, dot_class, owner):
+    def get_dot_time_left(self, dot_class, owner, target_index=0):
         """Get remaining time on a dot in seconds"""
-        if not self.is_dot_active(dot_class, owner):
+        if not self.is_dot_active(dot_class, owner, target_index):
             return 0
-        
-        dot = self.dots[dot_class][owner]
-        
+
+        key = (owner, target_index)
+        dot = self.dots[dot_class][key]
+
         # Calculate time until next tick
         time_since_last_tick = self.env.now - dot.last_tick_time
         time_until_next_tick = dot.time_between_ticks - time_since_last_tick
-        
+
         # Total time = time until next tick + time for remaining ticks after that
         remaining_ticks_after_next = max(0, dot.ticks_left - 1)
         total_time_left = time_until_next_tick + (remaining_ticks_after_next * dot.time_between_ticks)
-        
+
         return max(0, total_time_left)
 
-    def get_dot_ticks_left(self, dot_class, owner):
+    def get_dot_ticks_left(self, dot_class, owner, target_index=0):
         """Get remaining ticks on a dot"""
-        if not self.is_dot_active(dot_class, owner):
+        if not self.is_dot_active(dot_class, owner, target_index):
             return 0
-        
-        dot = self.dots[dot_class][owner]
+
+        key = (owner, target_index)
+        dot = self.dots[dot_class][key]
         return dot.ticks_left
+
+    def add_decaying_flesh_stack(self, owner, target_index=0):
+        """Add a stack of Decaying Flesh for a specific owner and target.
+        When reaching 3 stacks, triggers Feast of Hakkar DoT and resets stacks."""
+        key = (owner, target_index)
+
+        # Get current stacks (default to 0)
+        current_stacks = self.decaying_flesh_stacks.get(key, 0)
+
+        # Increment stacks
+        current_stacks += 1
+
+        if EmbraceOfTheWindSerpent.PRINT_PROC:
+            owner.print(f"Decaying Flesh stack {current_stacks} added on target {target_index}")
+
+        if current_stacks >= 3:
+            # Trigger Feast of Hakkar DoT
+            if EmbraceOfTheWindSerpent.PRINT_PROC:
+                owner.print(f"Triggering Feast of Hakkar on target {target_index}")
+
+            # Clear Feast of Hakkar for all other players on this target
+            self._clear_feast_of_hakkar_for_other_players(owner, target_index)
+
+            # Add/refresh Feast of Hakkar for current player
+            self.add_dot(FeastOfHakkarDot, owner, cast_time=0, target_index=target_index)
+
+            # Reset stacks
+            self.decaying_flesh_stacks[key] = 0
+        else:
+            # Update stacks
+            self.decaying_flesh_stacks[key] = current_stacks
+
+    def _clear_feast_of_hakkar_for_other_players(self, owner, target_index):
+        """Clear Feast of Hakkar DoT for all players except the specified owner on the given target."""
+        if FeastOfHakkarDot not in self.dots:
+            return
+
+        # Find all keys for this target_index with different owners
+        keys_to_remove = []
+        for key in self.dots[FeastOfHakkarDot].keys():
+            key_owner, key_target_index = key
+            if key_target_index == target_index and key_owner != owner:
+                # Mark this DoT as expired by setting ticks to 0
+                self.dots[FeastOfHakkarDot][key].ticks_left = 0
+                keys_to_remove.append(key)
+                if self.env.print_dots:
+                    self.env.p(f"{self.env.time()} - ({key_owner.name}) Feast of Hakkar cleared from target {target_index}")
+
+        # Clean up the cleared DoTs
+        for key in keys_to_remove:
+            del self.dots[FeastOfHakkarDot][key]
+
+    def get_decaying_flesh_stacks(self, owner, target_index=0):
+        """Get the current number of Decaying Flesh stacks for a specific owner and target."""
+        key = (owner, target_index)
+        return self.decaying_flesh_stacks.get(key, 0)
+
+    def clear_decaying_flesh_stacks(self, owner, target_index=0):
+        """Clear Decaying Flesh stacks for a specific owner and target."""
+        key = (owner, target_index)
+        if key in self.decaying_flesh_stacks:
+            del self.decaying_flesh_stacks[key]
 
     # special case due to shared debuff
     def is_curse_of_shadows_active(self):

@@ -698,6 +698,9 @@ class Mage(Character):
                         cast_time=0,
                         aoe=spell in SPELL_HITS_MULTIPLE_TARGETS,
                         increment_cast=False)
+
+                    if self.item_proc_handler:
+                        self.item_proc_handler.check_for_procs(self.env.now, spell, DamageType.ARCANE, True)
                 else:
                     break
 

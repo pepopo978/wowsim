@@ -27,6 +27,8 @@ class ItemProcHandler:
                 self.procs.append(BladeOfEternalDarkness(character, self._blade_of_eternal_darkness_proc))
             if equipped_items.ornate_bloodstone_dagger:
                 self.procs.append(OrnateBloodstoneDagger(character, self._ornate_bloodstone_dagger_proc))
+            if equipped_items.embrace_of_the_wind_serpent:
+                self.procs.append(EmbraceOfTheWindSerpent(character, self._embrance_of_the_wind_serpent_proc))
             if equipped_items.wrath_of_cenarius:
                 self.wrath_of_cenarius_buff = WrathOfCenariusBuff(character)
                 self.procs.append(WrathOfCenarius(character, self._wrath_of_cenarius_proc))
@@ -48,9 +50,9 @@ class ItemProcHandler:
                 self.procs.append(SpellwovenNobilityDrape(character, self._spellwoven_nobility_drape))
 
 
-    def check_for_procs(self, current_time, spell: Spell, damage_type: DamageType):
+    def check_for_procs(self, current_time, spell: Spell, damage_type: DamageType, is_resonance_cascade: bool = False):
         for proc in self.procs:
-            proc.check_for_proc(current_time, self.env.num_mobs, spell, damage_type)
+            proc.check_for_proc(current_time, self.env.num_mobs, spell, damage_type, is_resonance_cascade)
 
     def _tigger_proc_dmg(self, spell, min_dmg, max_dmg, damage_type):
         dmg = self.character.roll_spell_dmg(min_dmg, max_dmg, SPELL_COEFFICIENTS.get(spell, 0), damage_type)
@@ -66,17 +68,29 @@ class ItemProcHandler:
             dmg=dmg,
             aoe=False)
 
-    def _blade_of_eternal_darkness_proc(self):
+    def _blade_of_eternal_darkness_proc(self, target_index):
         self._tigger_proc_dmg(Spell.ENGULFING_SHADOWS, 100, 100, DamageType.SHADOW)
 
-    def _ornate_bloodstone_dagger_proc(self):
+    def _ornate_bloodstone_dagger_proc(self, target_index):
         self._tigger_proc_dmg(Spell.BURNING_HATRED, 250, 250, DamageType.FIRE)
 
-    def _wrath_of_cenarius_proc(self):
+    def _embrance_of_the_wind_serpent_proc(self, target_index):
+        min_dmg = 55
+        max_dmg = 71
+        #roll crit
+        if self.character._roll_crit(self.character.crit, DamageType.SHADOW):
+            crit_multiplier = 1.5
+            min_dmg = int(min_dmg * crit_multiplier)
+            max_dmg = int(max_dmg * crit_multiplier)
+
+        self._tigger_proc_dmg(Spell.DECAYING_FLESH, min_dmg, max_dmg, DamageType.SHADOW)
+        self.env.debuffs.add_decaying_flesh_stack(self.character, target_index)
+
+    def _wrath_of_cenarius_proc(self, target_index):
         if self.wrath_of_cenarius_buff:
             self.wrath_of_cenarius_buff.activate()
 
-    def _endless_gulch_proc(self):
+    def _endless_gulch_proc(self, target_index):
         self.wisdom_of_the_makaru_stacks += 1
         self.character.print(f"Wisdom of the Makaru proc {self.wisdom_of_the_makaru_stacks}")
         if self.wisdom_of_the_makaru_stacks >= 10:
@@ -84,18 +98,18 @@ class ItemProcHandler:
             if self.endless_gulch_buff:
                 self.endless_gulch_buff.activate()
                 
-    def _true_band_of_sulfuras_proc(self):
+    def _true_band_of_sulfuras_proc(self, target_index):
         if self.true_band_of_sulfuras_buff:
             self.true_band_of_sulfuras_buff.activate()                
 
-    def _unceasing_frost_proc(self):
+    def _unceasing_frost_proc(self, target_index):
         self.env.debuffs.add_freezing_cold()
 
-    def _bindings_proc(self):
+    def _bindings_proc(self, target_index):
         if self.bindings_buff:
             self.bindings_buff.activate()
 
-    def _sigil_of_ancient_accord_proc(self):
+    def _sigil_of_ancient_accord_proc(self, target_index):
         dmg = self.character.roll_spell_dmg(400, 400, SPELL_COEFFICIENTS.get(Spell.ANCIENT_ACCORD, 0),  DamageType.ARCANE)
         dmg = self.character.modify_dmg(dmg, DamageType.ARCANE, is_periodic=False)
 
@@ -133,6 +147,6 @@ class ItemProcHandler:
                 dmg=dmg,
                 aoe=False)
 
-    def _spellwoven_nobility_drape(self):
+    def _spellwoven_nobility_drape(self, target_index):
         if self.spellwoven_nobility_drape_buff:
             self.spellwoven_nobility_drape_buff.activate()

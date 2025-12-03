@@ -54,6 +54,7 @@ class Spell(Enum):
     BURNING_HATRED = "Burning Hatred"  # Ornate Bloodstone Dagger
     ANCIENT_ACCORD = "Ancient Accord"  # Sigil of Ancient Accord
     ANCIENT_ACCORD_SPLASH = "Ancient Accord Splash AOE"  # Sigil of Ancient Accord splash dmg to nearby targets
+    DECAYING_FLESH = "Decaying Flesh"  # Embrace of the Wind Serpent
 
 
 SPELL_COEFFICIENTS = {
@@ -99,7 +100,8 @@ SPELL_COEFFICIENTS = {
     Spell.ENGULFING_SHADOWS: 0,  # Blade of Eternal Darkness
     Spell.BURNING_HATRED: 0.4285,  # Ornate Bloodstone Dagger
     Spell.ANCIENT_ACCORD: 0.15,  # Sigil of Ancient Accord
-    Spell.ANCIENT_ACCORD_SPLASH: 0.05  # Sigil of Ancient Accord splash dmg to nearby targets
+    Spell.ANCIENT_ACCORD_SPLASH: 0.05,  # Sigil of Ancient Accord splash dmg to nearby targets
+    Spell.DECAYING_FLESH: 0 # Embrace of the Wind Serpent
 }
 
 SPELL_TRIGGERS_ON_HIT = {
@@ -143,7 +145,8 @@ SPELL_TRIGGERS_ON_HIT = {
     # Proc Spells
     Spell.ENGULFING_SHADOWS: False,  # Blade of Eternal Darkness
     Spell.BURNING_HATRED: False,  # Ornate Bloodstone Dagger
-    Spell.ANCIENT_ACCORD: False  # Sigil of Ancient Accord
+    Spell.ANCIENT_ACCORD: False,  # Sigil of Ancient Accord
+    Spell.DECAYING_FLESH: False,  # Embrace of the Wind Serpent
 }
 
 SPELL_PROJECTILE_SPEED = {

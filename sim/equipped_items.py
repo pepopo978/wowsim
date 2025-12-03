@@ -6,6 +6,7 @@ from sim.decorators import simequipped
 class EquippedItems:
     blade_of_eternal_darkness: bool = simequipped("Blade of Eternal Darkness (10% chance for 100 dmg and mana)", default=False)
     ornate_bloodstone_dagger: bool = simequipped("Ornate Bloodstone Dagger (20% chance to do 250 fire dmg to target and self)", default=False)
+    embrace_of_the_wind_serpent: bool = simequipped("Embrace of the Wind Serpent (15% chance to do 55-71 shadow dmg and apply debuff)", default=False)
     wrath_of_cenarius: bool = simequipped("Wrath of Cenarius (5% chance for 132 sp for 10s)", default=False)
     endless_gulch: bool = simequipped("Endless Gulch (20% chance to get stacks, at 8 stacks increase cast speed 20% for 10s)", default=False)
     true_band_of_sulfuras: bool = simequipped("True Band of Sulfuras (5% haste proc)", default=False)

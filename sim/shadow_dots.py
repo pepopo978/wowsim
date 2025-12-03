@@ -106,3 +106,14 @@ class SiphonLifeDot(WarlockShadowDot):
             dmg *= 1.5
 
         return int(self.owner.modify_dmg(dmg, self.damage_type, is_periodic=True))
+
+
+class FeastOfHakkarDot(Dot):
+    def __init__(self, owner, env, cast_time: float):
+        super().__init__("Feast of Hakkar", owner, env, DamageType.SHADOW, cast_time)
+
+        self.coefficient = 0  # No spell power scaling
+        self.base_time_between_ticks = 1  # Ticks every 1 second
+        self.ticks_left = 10  # 10 total ticks
+        self.starting_ticks = 10
+        self.base_tick_dmg = 30  # 30 damage per tick

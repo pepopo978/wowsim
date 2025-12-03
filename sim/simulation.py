@@ -168,7 +168,7 @@ class Simulation:
                  characters: List[Character] = None,
                  permanent_coe: bool = True,
                  permanent_cos: bool = True,
-                 permanent_shadow_weaving: bool = True,
+                 permanent_shadow_weaving: bool = False,
                  permanent_nightfall: bool = False,
                  permanent_isb: bool = False,
                  num_mobs: int = 1,
