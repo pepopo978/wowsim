@@ -1,4 +1,5 @@
 import os
+import random
 import time
 import traceback
 from collections import defaultdict
@@ -82,8 +83,12 @@ def run_simulation(args, chunk_range):
             for character in characters:
                 character.reset()
 
+            # randomize duration based on duration_variation
+            variation = args['duration_variation']
+            duration = args['duration'] * random.uniform(1 - variation, 1 + variation)
+
             env.add_characters(characters)
-            env.run(until=args['duration'])
+            env.run(until=duration)
 
             dps_results = env.meter.dps()
 
@@ -172,7 +177,8 @@ class Simulation:
                  permanent_nightfall: bool = False,
                  permanent_isb: bool = False,
                  num_mobs: int = 1,
-                 mob_level: int = 63):
+                 mob_level: int = 63,
+                 duration_variation: float = 0.05):
         self.characters = characters or []
         self.permanent_coe = permanent_coe
         self.permanent_cos = permanent_cos
@@ -181,6 +187,7 @@ class Simulation:
         self.permanent_isb = permanent_isb
         self.num_mobs = num_mobs
         self.mob_level = mob_level
+        self.duration_variation = duration_variation
         self.duration = 0
         self.results = None
 
@@ -194,6 +201,7 @@ class Simulation:
             chunk_size: int = 128):
 
         self.duration = duration
+        print(f"Duration variation: ±{self.duration_variation * 100:.1f}%")
 
         if use_multiprocessing:
             if print_casts or print_dots:
@@ -229,7 +237,8 @@ class Simulation:
                 'permanent_isb': self.permanent_isb,
                 'num_mobs': self.num_mobs,
                 'mob_level': self.mob_level,
-                'duration': duration
+                'duration': duration,
+                'duration_variation': self.duration_variation
             }
 
             completed = 0
@@ -249,7 +258,7 @@ class Simulation:
                             results.append(result)
                             completed += 1
 
-                            if completed % 10 == 0 or completed == total_chunks:
+                            if completed % 25 == 0 or completed == total_chunks:
                                 print(f"Processed {completed}/{total_chunks} chunks", flush=True)
 
                         except TimeoutError:
@@ -342,7 +351,9 @@ class Simulation:
 
                 env.add_characters(self.characters)
 
-                env.run(until=duration)
+                # randomize duration based on duration_variation
+                randomized_duration = duration * random.uniform(1 - self.duration_variation, 1 + self.duration_variation)
+                env.run(until=randomized_duration)
                 dps_results = env.meter.dps()
                 for character, mdps in dps_results.items():
                     self.results['dps'][character].append(mdps)
@@ -512,7 +523,7 @@ class Simulation:
                 mean_dps = mean(self.results['dps'][char])
                 mean_casts = mean(self.results['casts'][char])
                 label = f"{char} DPS Mean"
-                msg = f"{self._justify(label)}: {mean_dps} in {mean_casts} casts"
+                msg = f"{self._justify(label)}: {mean_dps:.1f} in {mean_casts} casts"
                 messages_to_dps[msg] = mean_dps
                 chars_to_dps[char] = mean_dps
 
@@ -526,10 +537,39 @@ class Simulation:
             print(f"{self._justify('Total ignite dmg')}: {mean(self.results['total_ignite_dmg'])}")
         print(f"{self._justify('Total dmg')}: {mean(self.results['total_dmg'])}")
 
-        print(f"{self._justify('Average char dps')}: {mean(self.results['avg_dps'])}")
-        print(f"{self._justify('Highest single char dps')}: {max(self.results['max_single_dps'])}")
+        print(f"{self._justify('Average char dps')}: {mean(self.results['avg_dps']):.1f}")
+        print(f"{self._justify('Highest single char dps')}: {max(self.results['max_single_dps']):.1f}")
 
         if verbosity > 1:
+            # Calculate spell power weights if we have the right characters
+            if 'control' in chars_to_dps and '20sp' in chars_to_dps:
+                control_dps = chars_to_dps['control']
+                sp60_dps = chars_to_dps['20sp']
+                sp_diff = sp60_dps - control_dps
+
+                if sp_diff != 0:
+                    print(f"\n------ Stat Weights (in Spell Power) ------")
+
+                    # Check for hit
+                    if '1 hit' in chars_to_dps:
+                        hit_dps = chars_to_dps['1 hit']
+                        hit_weight = (hit_dps - control_dps) / sp_diff * 20
+                        print(f"{self._justify('1 Hit Rating')}: {hit_weight:.2f} SP")
+
+                    # Check for haste
+                    if '1 haste' in chars_to_dps:
+                        haste_dps = chars_to_dps['1 haste']
+                        haste_weight = (haste_dps - control_dps) / sp_diff * 20
+                        print(f"{self._justify('1 Haste Rating')}: {haste_weight:.2f} SP")
+
+                    # Check for crit
+                    if '1 crit' in chars_to_dps:
+                        crit_dps = chars_to_dps['1 crit']
+                        crit_weight = (crit_dps - control_dps) / sp_diff * 20
+                        print(f"{self._justify('1 Crit Rating')}: {crit_weight:.2f} SP")
+
+                    print(f"\n")
+
             if self.results['had_any_ignite']:
                 print(f"------ Ignite ------")
                 if verbosity > 2:
@@ -574,7 +614,7 @@ class Simulation:
                     percent_dmg = round(data['percent_dmg'] / iterations, 1)
                     avg_dmg = round(data['avg_dmg'] / iterations)
                     avg_cast_time = round(data['avg_cast_time'] / iterations, 2)
-                    avg_dps = round(data['avg_dps'] / iterations)
+                    avg_dps = round(data['avg_dps'] / iterations, 1)
 
                     if num_ticks > 0:
                         stats = f"{num_casts} casts ({num_ticks} ticks)"
@@ -634,17 +674,17 @@ class Simulation:
             print(f"------ Advanced Stats ------")
             for char in self.results['dps']:
                 label = f"{char} DPS standard deviation"
-                print(f"{self._justify(label)}: {round(np.std(self.results['dps'][char]), 2)}")
+                print(f"{self._justify(label)}: {np.std(self.results['dps'][char]):.1f}")
                 label = f"{char} DPS min"
-                print(f"{self._justify(label)}: {np.min(self.results['dps'][char])}")
+                print(f"{self._justify(label)}: {np.min(self.results['dps'][char]):.1f}")
                 label = f"{char} DPS 25th percentile"
-                print(f"{self._justify(label)}: {np.percentile(self.results['dps'][char], 25)}")
+                print(f"{self._justify(label)}: {np.percentile(self.results['dps'][char], 25):.1f}")
                 label = f"{char} DPS 50th percentile"
-                print(f"{self._justify(label)}: {np.percentile(self.results['dps'][char], 50)}")
+                print(f"{self._justify(label)}: {np.percentile(self.results['dps'][char], 50):.1f}")
                 label = f"{char} DPS 75th percentile"
-                print(f"{self._justify(label)}: {np.percentile(self.results['dps'][char], 75)}")
+                print(f"{self._justify(label)}: {np.percentile(self.results['dps'][char], 75):.1f}")
                 label = f"{char} DPS max"
-                print(f"{self._justify(label)}: {np.max(self.results['dps'][char])}")
+                print(f"{self._justify(label)}: {np.max(self.results['dps'][char]):.1f}")
 
     def extended_report(self):
         self.report(verbosity=2)

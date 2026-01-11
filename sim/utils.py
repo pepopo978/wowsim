@@ -5,7 +5,7 @@ from sim import JUSTIFY
 
 def _round(num):
     if num > 100:
-        return round(num)
+        return round(num, 1)
     elif num > 10:
         return round(num, 1)
     else:

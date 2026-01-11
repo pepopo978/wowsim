@@ -5,7 +5,7 @@ mages = []
 base_sp = 1000
 base_crit = 40
 base_hit = 16
-haste = 5
+haste = 10
 
 # m = Mage(name=f'embrace', sp=base_sp, crit=base_crit, hit=base_hit, haste=haste,
 #          tal=ArcaneMageTalents(),
@@ -37,39 +37,58 @@ haste = 5
 # m.spam_arcane_explosion(cds=CooldownUsages())
 # mages.append(m)
 
-m = Mage(name=f'sigil', sp=base_sp, crit=base_crit, hit=base_hit, haste=haste,
+m = Mage(name=f'normal', sp=base_sp, crit=base_crit, hit=base_hit, haste=haste,
          tal=ArcaneMageTalents(),
          opts=MageOptions(
              extra_second_arcane_missile=True,
+             use_presence_of_mind_on_cd=False,
          ),
          equipped_items=EquippedItems(
              ornate_bloodstone_dagger=False,
-             wrath_of_cenarius=True,
+             wrath_of_cenarius=False,
              true_band_of_sulfuras=False,
              endless_gulch=False,
              spellwoven_nobility_drape=False,
              embrace_of_the_wind_serpent=False,
-             sigil_of_ancient_accord=True,
+             sigil_of_ancient_accord=False,
          ))
-m.arcane_surge_rupture_missiles(cds=CooldownUsages())
+m.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
 mages.append(m)
-
-m = Mage(name=f'80 sp', sp=base_sp + 80, crit=base_crit, hit=base_hit, haste=haste,
-         tal=ArcaneMageTalents(),
-         opts=MageOptions(
-             extra_second_arcane_missile=True,
-         ),
-         equipped_items=EquippedItems(
-             ornate_bloodstone_dagger=False,
-             wrath_of_cenarius=True,
-             true_band_of_sulfuras=False,
-             endless_gulch=False,
-             spellwoven_nobility_drape=False,
-             embrace_of_the_wind_serpent=False,
-         ))
-m.arcane_surge_rupture_missiles(cds=CooldownUsages())
-mages.append(m)
+#
+# m = Mage(name=f'drape', sp=base_sp + 11, crit=base_crit, hit=base_hit, haste=haste,
+#          tal=ArcaneMageTalents(),
+#          opts=MageOptions(
+#              extra_second_arcane_missile=True,
+#          ),
+#          equipped_items=EquippedItems(
+#              ornate_bloodstone_dagger=False,
+#              wrath_of_cenarius=False,
+#              true_band_of_sulfuras=False,
+#              endless_gulch=False,
+#              spellwoven_nobility_drape=True,
+#              embrace_of_the_wind_serpent=False,
+#              sigil_of_ancient_accord=False,
+#          ))
+# m.arcane_surge_rupture_missiles(cds=CooldownUsages())
+# mages.append(m)
+#
+# m = Mage(name=f'60 sp', sp=base_sp + 60, crit=base_crit, hit=base_hit, haste=haste,
+#          tal=ArcaneMageTalents(),
+#          opts=MageOptions(
+#              extra_second_arcane_missile=True,
+#          ),
+#          equipped_items=EquippedItems(
+#              ornate_bloodstone_dagger=False,
+#              wrath_of_cenarius=False,
+#              true_band_of_sulfuras=False,
+#              endless_gulch=False,
+#              spellwoven_nobility_drape=False,
+#              embrace_of_the_wind_serpent=False,
+#
+#          ))
+# m.arcane_surge_rupture_missiles(cds=CooldownUsages())
+# mages.append(m)
 
 sim = Simulation(characters=mages, num_mobs=1, mob_level=63, permanent_cos=False, permanent_isb=False, permanent_shadow_weaving=False)
-sim.run(iterations=10000, duration=180, print_casts=False, use_multiprocessing=True)
+sim.run(iterations=10000, duration=120, print_casts=False, use_multiprocessing=True)
 sim.detailed_report()
