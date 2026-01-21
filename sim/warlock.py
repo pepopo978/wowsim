@@ -100,7 +100,7 @@ class Warlock(Character):
                      Spell.DARK_HARVEST_CHANNEL]:
             hit += self.tal.suppression * 2
 
-        return min(83 + self.hit, 99)
+        return min(83 + hit, 99)
 
     def _get_crit_multiplier(self, damage_type: DamageType, talent_school: TalentSchool):
         mult = super()._get_crit_multiplier(talent_school, damage_type)

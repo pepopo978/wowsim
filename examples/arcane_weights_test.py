@@ -14,7 +14,7 @@ equipped_items = EquippedItems(
 )
 options = MageOptions()
 
-for control_haste in range(25, 26, 1):
+for control_haste in range(15, 16, 1):
     print(f'\n=== Haste: {control_haste} ===')
     mages = []
 
@@ -48,7 +48,7 @@ for control_haste in range(25, 26, 1):
                       equipped_items=equipped_items)
 
         if fm:
-            fm.arcane_rupture_missiles()
+            fm.arcane_surge_rupture_missiles(cds=CooldownUsages(arcane_power=5, mqg=5))
             mages.append(fm)
 
 
