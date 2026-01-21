@@ -130,6 +130,9 @@ class Warlock(Character):
                 # while soul fire is on cooldown, the buff is active
                 dmg *= 1 + self.tal.improved_soul_fire * 0.1
 
+        if self.opts.apply_undead_bonus:
+            dmg *= 1.02
+
         return int(dmg)
 
     # resolve damage when spell reaches the target
@@ -606,6 +609,11 @@ class Warlock(Character):
 
         if self.tal.improved_drains:
             dmg *= 1 + self.tal.improved_drains * 0.05
+
+                
+        if self.tal.improved_shadow_bolt:
+            if self._roll_proc(self.tal.improved_shadow_bolt*2):
+                self.env.debuffs.improved_shadow_bolt.refresh(self)
 
         yield from self._channel_tick(
             spell=Spell.DRAIN_SOUL,
