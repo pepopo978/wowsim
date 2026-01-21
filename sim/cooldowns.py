@@ -646,6 +646,7 @@ class Cooldowns:
         self.presence_of_mind = PresenceOfMind(character, has_accelerated_arcana)
 
         self.potion_of_quickness = PotionOfQuickness(character)
+        self.juju_flurry = JuJuFlurry(character)
 
         self.charm_of_magic = CharmOfMagic(character)
         self.toep = TOEP(character)

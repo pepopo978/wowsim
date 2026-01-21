@@ -706,7 +706,7 @@ class Warlock(Character):
         self.print("Nightfall proc!")
 
     def corrupted_soul_proc(self):
-        self.corrupted_soul
+        self.corrupted_soul = True
         self.print("Corrupted Soul proc!")
 
     def _spam_shadowbolt(self, cds: CooldownUsages = CooldownUsages(), delay=2):

@@ -40,9 +40,10 @@ class CorruptionDot(WarlockShadowDot):
         self.base_tick_dmg = 137
 
         #Corrupted soul (nemesis 8pc) increases damage of your next corruption by 15% on proc
-        if self.owner.corrupted_soul:
+        if owner.corrupted_soul:
             self.base_tick_dmg = 137 * 1.15
             self.coefficient = 0.1666 * 1.15 #Don't know if it also increases sp scaling
+            owner.corrupted_soul = False
 
     def _do_dmg(self):
         super()._do_dmg()
