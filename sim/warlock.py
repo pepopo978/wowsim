@@ -899,6 +899,60 @@ class Warlock(Character):
             # fill with Drain Soul
             yield from self._drain_soul_channel()
 
+    def _coa_corruption_siphon_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+
+        self._use_cds(cds)
+        yield from self._random_delay(delay)
+
+        while True:
+            self._use_cds(cds)
+
+            if self.opts.use_nightfall_as_affliction and self.nightfall:
+                yield from self._shadowbolt()
+                continue
+
+            if not self.env.debuffs.is_dot_active(CurseOfAgonyDot, self):
+                yield from self._curse_of_agony()
+                continue
+
+            # Keep Corruption up
+            if not self.env.debuffs.is_dot_active(CorruptionDot, self):
+                yield from self._corruption()
+                continue
+
+            # Keep Siphon Life up if we're using it
+            if not self.env.debuffs.is_dot_active(SiphonLifeDot, self):
+                yield from self._siphon_life()
+                continue
+
+            # fill with Drain Soul
+            yield from self._drain_soul_channel()
+
+    def _coa_corruption_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+
+        self._use_cds(cds)
+        yield from self._random_delay(delay)
+
+        while True:
+            self._use_cds(cds)
+
+            if self.opts.use_nightfall_as_affliction and self.nightfall:
+                yield from self._shadowbolt()
+                continue
+
+            if not self.env.debuffs.is_dot_active(CurseOfAgonyDot, self):
+                yield from self._curse_of_agony()
+                continue
+
+            # Keep Corruption up
+            if not self.env.debuffs.is_dot_active(CorruptionDot, self):
+                yield from self._corruption()
+                continue
+
+            # fill with Drain Soul
+            yield from self._drain_soul_channel()
+    
+
     # affliction
     @simrotation("(Affli) CoA -> Corruption -> Siphon Life -> Harvest -> Drain Soul")
     def coa_corruption_siphon_harvest_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
@@ -950,3 +1004,15 @@ class Warlock(Character):
     @simrotation("CoA -> Corruption -> Immolate -> Shadowbolt")
     def coa_corruption_immolate_shadowbolt(self, cds: CooldownUsages = CooldownUsages(), delay=2):
         return partial(self._set_rotation, name="coa_corruption_immolate_shadowbolt")(cds=cds, delay=delay)
+
+    @simrotation("(Affli) CoA -> Corruption -> Siphon Life -> Drain Soul")
+    def coa_corruption_siphon_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        return (partial(self._set_rotation,
+                        name="coa_corruption_siphon_drain")
+                (cds=cds, delay=delay))
+    
+    @simrotation("(Affli) CoA -> Corruption -> Drain Soul")
+    def coa_corruption_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        return (partial(self._set_rotation,
+                        name="coa_corruption_drain")
+                (cds=cds, delay=delay))
