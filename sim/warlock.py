@@ -74,6 +74,7 @@ class Warlock(Character):
 
         # Warlock
         self.nightfall = False
+        self.corrupted_soul = False
 
         if self.tal:
             if self.tal.rapid_deterioration:
@@ -609,11 +610,24 @@ class Warlock(Character):
 
         if self.tal.improved_drains:
             dmg *= 1 + self.tal.improved_drains * 0.05
+        
+        if self.opts.felheart_drain_soul_bonus_1:
+            dmg *= 1.05
 
+        if self.opts.nemesis_duration_bonus_2:
+            if random.randint(1, 100) <= 0: #Find out proc chance
+                self.corrupted_soul_proc()
                 
         if self.tal.improved_shadow_bolt:
             if self._roll_proc(self.tal.improved_shadow_bolt*2):
                 self.env.debuffs.improved_shadow_bolt.refresh(self)
+
+
+        # DS also triggers NF
+        if hasattr(self.tal, "nightfall") and self.tal.nightfall > 0:
+            if random.randint(1, 100) <= self.tal.nightfall * 2:
+                self.nightfall_proc()
+
 
         yield from self._channel_tick(
             spell=Spell.DRAIN_SOUL,
@@ -673,6 +687,12 @@ class Warlock(Character):
         if self.tal.soul_siphon:
             dmg *= self._get_soul_siphon_multiplier()
 
+
+        # DH also triggers NF
+        if hasattr(self.tal, "nightfall") and self.tal.nightfall > 0:
+            if random.randint(1, 100) <= self.tal.nightfall * 2:
+                self.nightfall_proc()
+
         yield from self._channel_tick(
             spell=Spell.DARK_HARVEST,
             damage_type=DamageType.SHADOW,
@@ -684,6 +704,10 @@ class Warlock(Character):
     def nightfall_proc(self):
         self.nightfall = True
         self.print("Nightfall proc!")
+
+    def corrupted_soul_proc(self):
+        self.corrupted_soul
+        self.print("Corrupted Soul proc!")
 
     def _spam_shadowbolt(self, cds: CooldownUsages = CooldownUsages(), delay=2):
         self._use_cds(cds)

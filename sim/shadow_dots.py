@@ -23,16 +23,26 @@ class CorruptionDot(WarlockShadowDot):
 
         self.coefficient = 0.1666
         self.base_time_between_ticks = 3
+
+
         
         # Base duration is 18 seconds (6 ticks * 3 seconds)
         # Eye of Dormant Corruption adds 3 seconds (1 extra tick)
         base_ticks = 6
         if owner.opts.eye_of_dormant_corruption:
             base_ticks += 1
-            
+        # Nemesis 5pc adds 3 seconds
+        if owner.opts.nemesis_duration_bonus_2:
+            base_ticks += 1
+
         self.ticks_left = base_ticks
         self.starting_ticks = base_ticks
         self.base_tick_dmg = 137
+
+        #Corrupted soul (nemesis 8pc) increases damage of your next corruption by 15% on proc
+        if self.owner.corrupted_soul:
+            self.base_tick_dmg = 137 * 1.15
+            self.coefficient = 0.1666 * 1.15 #Don't know if it also increases sp scaling
 
     def _do_dmg(self):
         super()._do_dmg()
