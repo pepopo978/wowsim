@@ -4,9 +4,14 @@ from sim.decorators import simoption
 @dataclass(kw_only=True)
 class WarlockOptions:
     distance_from_mob: int = simoption("Distance From Mob", default=25, spec=None)
+    apply_undead_bonus: bool = simoption("Apply Undead Bonus (+2% damage vs undead)", default=False, spec=None)
 
     permanent_curse: bool = simoption("Assume curse is always up", default=True)
     firestone: bool = simoption("2% fire crit chance", default=False)
+
+    felheart_drain_soul_bonus_1: bool = simoption("Increases drain soul damage by 5 percent", default=False)
+    nemesis_duration_bonus_2: bool = simoption("Adds 3 seconds to Corruption and siphon life duration", default=False)
+
     crit_dmg_bonus_35: bool = simoption("10% crit damage bonus", default=False)
     doomcaller_coa_bonus_25: bool = simoption("5% more Curse of Agony dmg", default=False)
     doomcaller_dh_bonus_25: bool = simoption("The last tick of your Dark Harvest spell deals 400% damage", default=False)

@@ -350,6 +350,24 @@ class PotionOfQuickness(Cooldown):
         self.character.remove_consume_haste(self.name)
 
 
+class JuJuFlurry(Cooldown):
+    @property
+    def cooldown(self):
+        return 60
+
+    @property
+    def duration(self):
+        return 20
+
+    def activate(self):
+        super().activate()
+        self.character.add_consume_haste(self.name, 3)
+
+    def deactivate(self):
+        super().deactivate()
+        self.character.remove_consume_haste(self.name)
+
+
 class WrathOfCenariusBuff(Cooldown):
     DMG_BONUS = 132
     PRINTS_ACTIVATION = True
@@ -628,6 +646,7 @@ class Cooldowns:
         self.presence_of_mind = PresenceOfMind(character, has_accelerated_arcana)
 
         self.potion_of_quickness = PotionOfQuickness(character)
+        self.juju_flurry = JuJuFlurry(character)
 
         self.charm_of_magic = CharmOfMagic(character)
         self.toep = TOEP(character)

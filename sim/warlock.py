@@ -74,6 +74,7 @@ class Warlock(Character):
 
         # Warlock
         self.nightfall = False
+        self.corrupted_soul = False
 
         if self.tal:
             if self.tal.rapid_deterioration:
@@ -129,6 +130,9 @@ class Warlock(Character):
             if self.tal.improved_soul_fire and self.soul_fire_cd.on_cooldown:
                 # while soul fire is on cooldown, the buff is active
                 dmg *= 1 + self.tal.improved_soul_fire * 0.1
+
+        if self.opts.apply_undead_bonus:
+            dmg *= 1.02
 
         return int(dmg)
 
@@ -606,6 +610,24 @@ class Warlock(Character):
 
         if self.tal.improved_drains:
             dmg *= 1 + self.tal.improved_drains * 0.05
+        
+        if self.opts.felheart_drain_soul_bonus_1:
+            dmg *= 1.05
+
+        if self.opts.nemesis_duration_bonus_2:
+            if random.randint(1, 100) <= 0: #Find out proc chance
+                self.corrupted_soul_proc()
+                
+        if self.tal.improved_shadow_bolt:
+            if self._roll_proc(self.tal.improved_shadow_bolt*2):
+                self.env.debuffs.improved_shadow_bolt.refresh(self)
+
+
+        # DS also triggers NF
+        if hasattr(self.tal, "nightfall") and self.tal.nightfall > 0:
+            if random.randint(1, 100) <= self.tal.nightfall * 2:
+                self.nightfall_proc()
+
 
         yield from self._channel_tick(
             spell=Spell.DRAIN_SOUL,
@@ -665,6 +687,12 @@ class Warlock(Character):
         if self.tal.soul_siphon:
             dmg *= self._get_soul_siphon_multiplier()
 
+
+        # DH also triggers NF
+        if hasattr(self.tal, "nightfall") and self.tal.nightfall > 0:
+            if random.randint(1, 100) <= self.tal.nightfall * 2:
+                self.nightfall_proc()
+
         yield from self._channel_tick(
             spell=Spell.DARK_HARVEST,
             damage_type=DamageType.SHADOW,
@@ -676,6 +704,10 @@ class Warlock(Character):
     def nightfall_proc(self):
         self.nightfall = True
         self.print("Nightfall proc!")
+
+    def corrupted_soul_proc(self):
+        self.corrupted_soul = True
+        self.print("Corrupted Soul proc!")
 
     def _spam_shadowbolt(self, cds: CooldownUsages = CooldownUsages(), delay=2):
         self._use_cds(cds)
@@ -891,6 +923,60 @@ class Warlock(Character):
             # fill with Drain Soul
             yield from self._drain_soul_channel()
 
+    def _coa_corruption_siphon_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+
+        self._use_cds(cds)
+        yield from self._random_delay(delay)
+
+        while True:
+            self._use_cds(cds)
+
+            if self.opts.use_nightfall_as_affliction and self.nightfall:
+                yield from self._shadowbolt()
+                continue
+
+            if not self.env.debuffs.is_dot_active(CurseOfAgonyDot, self):
+                yield from self._curse_of_agony()
+                continue
+
+            # Keep Corruption up
+            if not self.env.debuffs.is_dot_active(CorruptionDot, self):
+                yield from self._corruption()
+                continue
+
+            # Keep Siphon Life up if we're using it
+            if not self.env.debuffs.is_dot_active(SiphonLifeDot, self):
+                yield from self._siphon_life()
+                continue
+
+            # fill with Drain Soul
+            yield from self._drain_soul_channel()
+
+    def _coa_corruption_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+
+        self._use_cds(cds)
+        yield from self._random_delay(delay)
+
+        while True:
+            self._use_cds(cds)
+
+            if self.opts.use_nightfall_as_affliction and self.nightfall:
+                yield from self._shadowbolt()
+                continue
+
+            if not self.env.debuffs.is_dot_active(CurseOfAgonyDot, self):
+                yield from self._curse_of_agony()
+                continue
+
+            # Keep Corruption up
+            if not self.env.debuffs.is_dot_active(CorruptionDot, self):
+                yield from self._corruption()
+                continue
+
+            # fill with Drain Soul
+            yield from self._drain_soul_channel()
+    
+
     # affliction
     @simrotation("(Affli) CoA -> Corruption -> Siphon Life -> Harvest -> Drain Soul")
     def coa_corruption_siphon_harvest_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
@@ -942,3 +1028,15 @@ class Warlock(Character):
     @simrotation("CoA -> Corruption -> Immolate -> Shadowbolt")
     def coa_corruption_immolate_shadowbolt(self, cds: CooldownUsages = CooldownUsages(), delay=2):
         return partial(self._set_rotation, name="coa_corruption_immolate_shadowbolt")(cds=cds, delay=delay)
+
+    @simrotation("(Affli) CoA -> Corruption -> Siphon Life -> Drain Soul")
+    def coa_corruption_siphon_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        return (partial(self._set_rotation,
+                        name="coa_corruption_siphon_drain")
+                (cds=cds, delay=delay))
+    
+    @simrotation("(Affli) CoA -> Corruption -> Drain Soul")
+    def coa_corruption_drain(self, cds: CooldownUsages = CooldownUsages(), delay=2):
+        return (partial(self._set_rotation,
+                        name="coa_corruption_drain")
+                (cds=cds, delay=delay))
