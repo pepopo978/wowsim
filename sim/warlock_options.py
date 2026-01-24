@@ -4,7 +4,6 @@ from sim.decorators import simoption
 @dataclass(kw_only=True)
 class WarlockOptions:
     distance_from_mob: int = simoption("Distance From Mob", default=25, spec=None)
-    apply_undead_bonus: bool = simoption("Apply Undead Bonus (+2% damage vs undead)", default=False, spec=None)
 
     permanent_curse: bool = simoption("Assume curse is always up", default=True)
     firestone: bool = simoption("2% fire crit chance", default=False)

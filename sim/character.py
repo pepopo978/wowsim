@@ -20,6 +20,7 @@ class Character:
                  haste: float,
                  lag: float,
                  equipped_items: EquippedItems = None,
+                 creature_type_dmg_mod: int = 0 # can pass 2 for 2% to undead, 5 for 5% to mech, etc
                  ):
 
         self.name = name
@@ -29,6 +30,7 @@ class Character:
         self.haste = haste
         self.lag = lag
         self.env = None
+        self.creature_type_dmg_mult = 1 + creature_type_dmg_mod / 100
 
         self.tal = tal
 
@@ -290,6 +292,10 @@ class Character:
     def modify_dmg(self, dmg: int, damage_type: DamageType, is_periodic: bool):
         if self._dmg_modifier != 1:
             dmg *= self._dmg_modifier
+
+        if self.creature_type_dmg_mult > 1:
+            dmg *= self.creature_type_dmg_mult
+
         # apply env debuffs
         return self.env.debuffs.modify_dmg(self, dmg, damage_type, is_periodic)
 

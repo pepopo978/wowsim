@@ -28,8 +28,9 @@ class Mage(Character):
                  haste: float = 0,
                  lag: float = 0.07,  # lag added by server tick time
                  equipped_items: EquippedItems = None,
+                 creature_type_dmg_mod: int = 0
                  ):
-        super().__init__(tal, name, sp, crit, hit, haste, lag, equipped_items)
+        super().__init__(tal, name, sp, crit, hit, haste, lag, equipped_items, creature_type_dmg_mod)
         self.tal = tal
         self.opts = opts
 
